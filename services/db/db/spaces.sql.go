@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"log"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -86,6 +87,7 @@ ORDER BY id
 
 func (q *Queries) GetFeatures(ctx context.Context) ([]Feature, error) {
 	rows, err := q.db.Query(ctx, getFeatures)
+	log.Println(err)
 	if err != nil {
 		return nil, err
 	}

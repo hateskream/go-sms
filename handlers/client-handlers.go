@@ -17,14 +17,15 @@ func (h *Handlers) FindSpaces(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) GetFeatures(w http.ResponseWriter, r *http.Request) {
+
 	features, err := h.Storage.GetFeatures(context.Background())
 	if err != nil {
-		http.Error(w, http.StatusText(500), 500)
+		http.Error(w, err.Error(), 500)
 		return
 	}
 	jsonData, err := json.Marshal(features)
 	if err != nil {
-		http.Error(w, http.StatusText(500), 500)
+		http.Error(w, err.Error(), 500)
 		return
 	}
 	w.Write(jsonData)
