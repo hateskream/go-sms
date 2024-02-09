@@ -11,6 +11,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addCardNumber = `-- name: AddCardNumber :one
+INSERT INTO cars (number)
+VALUES ($1::VARCHAR) RETURNING id
+`
+
+func (q *Queries) AddCardNumber(ctx context.Context, number string) (int32, error) {
+	row := q.db.QueryRow(ctx, addCardNumber, number)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
 const addFeature = `-- name: AddFeature :one
 INSERT INTO features (name)
 VALUES ($1) RETURNING id
@@ -23,23 +35,44 @@ func (q *Queries) AddFeature(ctx context.Context, name string) (int32, error) {
 	return id, err
 }
 
-const addSpace = `-- name: AddSpace :one
-INSERT INTO spaces (name)
-VALUES ($1) RETURNING id, name, physical_id, group_id, status_id, has_camera
+const addReservation = `-- name: AddReservation :one
+INSERT INTO space_reservations (time_from, time_to, car_id, reservation_fee, space_id, status_id)
+VALUES ($1,$2,$3,$4,$5,$6) RETURNING id
 `
 
-func (q *Queries) AddSpace(ctx context.Context, name string) (Space, error) {
-	row := q.db.QueryRow(ctx, addSpace, name)
-	var i Space
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.PhysicalID,
-		&i.GroupID,
-		&i.StatusID,
-		&i.HasCamera,
+type AddReservationParams struct {
+	TimeFrom       pgtype.Timestamp `json:"time_from"`
+	TimeTo         pgtype.Timestamp `json:"time_to"`
+	CarID          pgtype.Int4      `json:"car_id"`
+	ReservationFee float32          `json:"reservation_fee"`
+	SpaceID        pgtype.Int4      `json:"space_id"`
+	StatusID       pgtype.Int4      `json:"status_id"`
+}
+
+func (q *Queries) AddReservation(ctx context.Context, arg AddReservationParams) (int32, error) {
+	row := q.db.QueryRow(ctx, addReservation,
+		arg.TimeFrom,
+		arg.TimeTo,
+		arg.CarID,
+		arg.ReservationFee,
+		arg.SpaceID,
+		arg.StatusID,
 	)
-	return i, err
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
+const addSpace = `-- name: AddSpace :one
+INSERT INTO spaces (name)
+VALUES ($1) RETURNING id
+`
+
+func (q *Queries) AddSpace(ctx context.Context, name string) (int32, error) {
+	row := q.db.QueryRow(ctx, addSpace, name)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
 }
 
 const addSpaceFeature = `-- name: AddSpaceFeature :exec
@@ -130,6 +163,19 @@ func (q *Queries) GetAllSpaces(ctx context.Context) ([]GetAllSpacesRow, error) {
 	return items, nil
 }
 
+const getCardByNumber = `-- name: GetCardByNumber :one
+SELECT cars.id
+FROM cars
+WHERE cars.number = $1::VARCHAR
+`
+
+func (q *Queries) GetCardByNumber(ctx context.Context, number string) (int32, error) {
+	row := q.db.QueryRow(ctx, getCardByNumber, number)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getFeatures = `-- name: GetFeatures :many
 SELECT id, name
 FROM features
@@ -145,6 +191,31 @@ func (q *Queries) GetFeatures(ctx context.Context) ([]Feature, error) {
 	var items []Feature
 	for rows.Next() {
 		var i Feature
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSpaceStatuses = `-- name: GetSpaceStatuses :many
+Select id, name
+From space_statuses
+`
+
+func (q *Queries) GetSpaceStatuses(ctx context.Context) ([]SpaceStatus, error) {
+	rows, err := q.db.Query(ctx, getSpaceStatuses)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SpaceStatus
+	for rows.Next() {
+		var i SpaceStatus
 		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
@@ -243,5 +314,38 @@ type UpdateFeatureParams struct {
 
 func (q *Queries) UpdateFeature(ctx context.Context, arg UpdateFeatureParams) error {
 	_, err := q.db.Exec(ctx, updateFeature, arg.ID, arg.Name)
+	return err
+}
+
+const updateReservationState = `-- name: UpdateReservationState :exec
+UPDATE space_reservations
+  set status_id = $2
+WHERE space_reservations.id = $1
+`
+
+type UpdateReservationStateParams struct {
+	ID       int32       `json:"id"`
+	StatusID pgtype.Int4 `json:"status_id"`
+}
+
+func (q *Queries) UpdateReservationState(ctx context.Context, arg UpdateReservationStateParams) error {
+	_, err := q.db.Exec(ctx, updateReservationState, arg.ID, arg.StatusID)
+	return err
+}
+
+const updateSpaceStatus = `-- name: UpdateSpaceStatus :exec
+UPDATE spaces
+  set status_id = $3
+WHERE spaces.id = $1 AND spaces.status_id = $2
+`
+
+type UpdateSpaceStatusParams struct {
+	ID         int32       `json:"id"`
+	StatusID   pgtype.Int4 `json:"status_id"`
+	StatusID_2 pgtype.Int4 `json:"status_id_2"`
+}
+
+func (q *Queries) UpdateSpaceStatus(ctx context.Context, arg UpdateSpaceStatusParams) error {
+	_, err := q.db.Exec(ctx, updateSpaceStatus, arg.ID, arg.StatusID, arg.StatusID_2)
 	return err
 }

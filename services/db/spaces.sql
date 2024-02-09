@@ -1,6 +1,6 @@
 -- name: AddSpace :one
 INSERT INTO spaces (name)
-VALUES ($1) RETURNING *;
+VALUES ($1) RETURNING id;
 
 -- name: AddSpaceFeature :exec
 INSERT INTO space_features (space_id,Feature_id)
@@ -62,3 +62,31 @@ JOIN
 WHERE sf.feature_id = ANY(sqlc.arg(feature_list)::int[]) AND s.status_id = 1
 GROUP BY s.id
 HAVING  COUNT(DISTINCT sf.feature_id) = sqlc.arg(feature_count)::int; 
+
+-- name: UpdateSpaceStatus :exec
+UPDATE spaces
+  set status_id = $3
+WHERE spaces.id = $1 AND spaces.status_id = $2;
+
+-- name: GetCardByNumber :one
+SELECT cars.id
+FROM cars
+WHERE cars.number = sqlc.arg(number)::VARCHAR;
+
+-- name: AddCardNumber :one
+INSERT INTO cars (number)
+VALUES (sqlc.arg(number)::VARCHAR) RETURNING id;
+
+-- name: AddReservation :one
+INSERT INTO space_reservations (time_from, time_to, car_id, reservation_fee, space_id, status_id)
+VALUES ($1,$2,$3,$4,$5,$6) RETURNING id;
+
+-- name: UpdateReservationState :exec
+UPDATE space_reservations
+  set status_id = $2
+WHERE space_reservations.id = $1;
+
+-- name: GetSpaceStatuses :many
+Select *
+From space_statuses;
+

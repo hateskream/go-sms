@@ -8,7 +8,7 @@ import (
 
 type HandlersInterface interface {
 	GetSpaces(w http.ResponseWriter, r *http.Request)
-	GetFeatures(w http.ResponseWriter, r *http.Request) //+
+	GetFeatures(w http.ResponseWriter, r *http.Request)
 	ReserveSpace(w http.ResponseWriter, r *http.Request)
 	UpdateReservationStatus(w http.ResponseWriter, r *http.Request)
 
@@ -19,8 +19,8 @@ type HandlersInterface interface {
 	AddSpace(w http.ResponseWriter, r *http.Request)
 	DeleteSpace(w http.ResponseWriter, r *http.Request)
 	UpdateSpace(w http.ResponseWriter, r *http.Request)
-	AddFeature(w http.ResponseWriter, r *http.Request)    //+
-	DeleteFeature(w http.ResponseWriter, r *http.Request) //+
+	AddFeature(w http.ResponseWriter, r *http.Request)
+	DeleteFeature(w http.ResponseWriter, r *http.Request)
 	UpdateFeature(w http.ResponseWriter, r *http.Request)
 	AddPricingPolicy(w http.ResponseWriter, r *http.Request)
 	DeletePricingPolicy(w http.ResponseWriter, r *http.Request)
@@ -40,6 +40,12 @@ type StorageInterface interface {
 	GetFeatures(ctx context.Context) ([]db.Feature, error)
 	AddFeature(ctx context.Context, name string) (int32, error)
 	DeleteFeature(ctx context.Context, id int32) (int32, error)
+	AddCardNumber(ctx context.Context, number string) (int32, error)
+	GetCardByNumber(ctx context.Context, number string) (int32, error)
+	UpdateSpaceStatus(ctx context.Context, arg db.UpdateSpaceStatusParams) error
+	AddReservation(ctx context.Context, arg db.AddReservationParams) (int32, error)
+	UpdateReservationState(ctx context.Context, arg db.UpdateReservationStateParams) error
+	GetSpaceStatuses(ctx context.Context) ([]db.SpaceStatus, error)
 }
 
 type HardwareInterface interface {

@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"space-management-system/services/db/db"
 	"space-management-system/utils"
+	"strconv"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func (h *Handlers) GetSpaces(w http.ResponseWriter, r *http.Request) {
@@ -73,8 +76,22 @@ func (h *Handlers) GetFeatures(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) ReserveSpace(w http.ResponseWriter, r *http.Request) {
-	//FindSpaces from params
-	//Take the best(set it status to reserved)
+	r.ParseForm()
+	space_id, err := strconv.Atoi(r.Form.Get("space"))
+	car_number := r.Form.Get("car_number")
+	if car_number == "" {
+		http.Error(w, "car number is required parameter", 422)
+	}
+	if err != nil {
+		http.Error(w, "incorrect space_id", 422)
+	}
+	params := db.UpdateSpaceStatusParams{
+		ID:         int32(space_id),
+		StatusID:   pgtype.Int4{Int32: 1, Valid: true},
+		StatusID_2: pgtype.Int4{Int32: 2, Valid: true},
+	}
+
+	h.Storage.UpdateSpaceStatus(context.Background(), params)
 	//Find user car or create one
 	//Add reservation record
 }
