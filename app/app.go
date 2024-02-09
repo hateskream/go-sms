@@ -7,8 +7,7 @@ import (
 )
 
 type HandlersInterface interface {
-	GetAllSpaces(w http.ResponseWriter, r *http.Request)
-	FindSpaces(w http.ResponseWriter, r *http.Request)
+	GetSpaces(w http.ResponseWriter, r *http.Request)
 	GetFeatures(w http.ResponseWriter, r *http.Request) //+
 	ReserveSpace(w http.ResponseWriter, r *http.Request)
 	UpdateReservationStatus(w http.ResponseWriter, r *http.Request)
@@ -36,7 +35,8 @@ type HandlersInterface interface {
 }
 
 type StorageInterface interface {
-	GetSpaces(ctx context.Context) ([]db.Space, error)
+	GetAllSpaces(ctx context.Context) ([]db.GetAllSpacesRow, error)
+	GetSpacesByFeatureList(ctx context.Context, arg db.GetSpacesByFeatureListParams) ([]db.GetSpacesByFeatureListRow, error)
 	GetFeatures(ctx context.Context) ([]db.Feature, error)
 	AddFeature(ctx context.Context, name string) (int32, error)
 	DeleteFeature(ctx context.Context, id int32) (int32, error)
@@ -45,8 +45,14 @@ type StorageInterface interface {
 type HardwareInterface interface {
 	SetLocker(id int) error
 }
+
+type MemoryStorageInterface interface {
+	setState()
+}
+
 type App struct {
 	Storage  StorageInterface
 	Hardware HardwareInterface
 	Handlers HandlersInterface
+	Memory   MemoryStorageInterface
 }

@@ -7,7 +7,6 @@ package db
 
 import (
 	"context"
-	"log"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -79,6 +78,58 @@ func (q *Queries) DeleteSpace(ctx context.Context, id int32) error {
 	return err
 }
 
+const getAllSpaces = `-- name: GetAllSpaces :many
+SELECT
+    s.id,
+    s.name,
+    space_statuses.name as status,
+    CAST(string_agg(f.name, ',') as VARCHAR) AS features
+FROM
+    spaces AS s
+JOIN
+    space_features sf ON s.id = sf.space_id
+JOIN
+    features f ON sf.feature_id = f.id    
+JOIN
+    (SELECT DISTINCT ON (s.id) s.id, space_statuses.name
+     FROM spaces AS s
+     JOIN space_statuses ON s.status_id = space_statuses.id
+     ORDER BY s.id) AS space_statuses ON s.id = space_statuses.id
+GROUP BY s.id, space_statuses.name
+`
+
+type GetAllSpacesRow struct {
+	ID       int32  `json:"id"`
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	Features string `json:"features"`
+}
+
+func (q *Queries) GetAllSpaces(ctx context.Context) ([]GetAllSpacesRow, error) {
+	rows, err := q.db.Query(ctx, getAllSpaces)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllSpacesRow
+	for rows.Next() {
+		var i GetAllSpacesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Status,
+			&i.Features,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFeatures = `-- name: GetFeatures :many
 SELECT id, name
 FROM features
@@ -87,7 +138,6 @@ ORDER BY id
 
 func (q *Queries) GetFeatures(ctx context.Context) ([]Feature, error) {
 	rows, err := q.db.Query(ctx, getFeatures)
-	log.Println(err)
 	if err != nil {
 		return nil, err
 	}
@@ -129,6 +179,47 @@ func (q *Queries) GetSpaces(ctx context.Context) ([]Space, error) {
 			&i.StatusID,
 			&i.HasCamera,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSpacesByFeatureList = `-- name: GetSpacesByFeatureList :many
+SELECT s.id, s.name
+FROM 
+  spaces s
+JOIN 
+  space_features sf ON s.id = sf.space_id
+WHERE sf.feature_id = ANY($1::int[]) AND s.status_id = 1
+GROUP BY s.id
+HAVING  COUNT(DISTINCT sf.feature_id) = $2::int
+`
+
+type GetSpacesByFeatureListParams struct {
+	FeatureList  []int32 `json:"feature_list"`
+	FeatureCount int32   `json:"feature_count"`
+}
+
+type GetSpacesByFeatureListRow struct {
+	ID   int32  `json:"id"`
+	Name string `json:"name"`
+}
+
+func (q *Queries) GetSpacesByFeatureList(ctx context.Context, arg GetSpacesByFeatureListParams) ([]GetSpacesByFeatureListRow, error) {
+	rows, err := q.db.Query(ctx, getSpacesByFeatureList, arg.FeatureList, arg.FeatureCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSpacesByFeatureListRow
+	for rows.Next() {
+		var i GetSpacesByFeatureListRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
