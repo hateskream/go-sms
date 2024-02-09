@@ -1,6 +1,9 @@
 -- name: AddSpace :one
-INSERT INTO spaces (name)
-VALUES ($1) RETURNING id;
+INSERT INTO spaces (name, physical_id, group_id, status_id )
+VALUES ($1,
+CASE WHEN $2 = '' THEN NULL ELSE $2,
+CASE WHEN $3 = '' THEN NULL ELSE $3,
+CASE WHEN $4 = '' THEN NULL ELSE $4);
 
 -- name: AddSpaceFeature :exec
 INSERT INTO space_features (space_id,Feature_id)

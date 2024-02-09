@@ -40,6 +40,9 @@ type StorageInterface interface {
 	GetFeatures(ctx context.Context) ([]db.Feature, error)
 	AddFeature(ctx context.Context, name string) (int32, error)
 	DeleteFeature(ctx context.Context, id int32) (int32, error)
+
+	UpdateFeature(ctx context.Context, arg db.UpdateFeatureParams) error
+
 	AddCardNumber(ctx context.Context, number string) (int32, error)
 	GetCardByNumber(ctx context.Context, number string) (int32, error)
 	UpdateSpaceStatus(ctx context.Context, arg db.UpdateSpaceStatusParams) error

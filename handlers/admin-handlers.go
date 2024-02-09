@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"space-management-system/services/db/db"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -15,7 +16,31 @@ func (h *Handlers) GetSpacesInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) AddSpace(w http.ResponseWriter, r *http.Request) {
-
+	r.ParseForm()
+	name := r.Form.Get("name")
+	if name == "" {
+		http.Error(w, "name is required field", 422)
+		return
+	}
+	physical_id := r.Form.Get("physical_id")
+	group_id := r.Form.Get("group_id")
+	status_id := r.Form.Get("status_id")
+	log.Printf("GetRequest: %s %s %s %s", name, physical_id, group_id, status_id)
+	return
+	// added_id, err := h.Storage.addSpace(context.Background(), name)
+	// if err != nil {
+	// 	http.Error(w, http.StatusText(500), 500)
+	// 	return
+	// }
+	// data := map[string]int32{
+	// 	"id": added_id,
+	// }
+	// jsonData, err := json.Marshal(data)
+	// if err != nil {
+	// 	http.Error(w, http.StatusText(500), 500)
+	// 	return
+	// }
+	// w.Write(jsonData)
 }
 
 func (h *Handlers) DeleteSpace(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +96,34 @@ func (h *Handlers) DeleteFeature(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) UpdateFeature(w http.ResponseWriter, r *http.Request) {
+
+	id := chi.URLParam(r, "featureID")
+	idInt, _ := strconv.Atoi(id)
+
+	r.ParseForm()
+	name := r.Form.Get("name")
+
+	params := db.UpdateFeatureParams{
+		ID:   int32(idInt),
+		Name: name,
+	}
+	err := h.Storage.UpdateFeature(context.Background(), params)
+
+	if err != nil {
+		errMsg := err.Error()
+		http.Error(w, errMsg, 500)
+		return
+	}
+
+	response := struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{
+		Success: true,
+		Message: "Feature successfully updated.",
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
 
 }
 
