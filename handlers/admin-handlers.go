@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func (h *Handlers) GetSpacesInfo(w http.ResponseWriter, r *http.Request) {
@@ -23,32 +24,95 @@ func (h *Handlers) AddSpace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	physical_id := r.Form.Get("physical_id")
+	physical_idInt, _ := strconv.Atoi(physical_id)
 	group_id := r.Form.Get("group_id")
+	group_idInt, _ := strconv.Atoi(group_id)
 	status_id := r.Form.Get("status_id")
+	status_idInt, _ := strconv.Atoi(status_id)
+
+	params := db.AddSpaceParams{
+		Name:       name,
+		PhysicalID: pgtype.Int4{Int32: int32(physical_idInt), Valid: true},
+		GroupID:    pgtype.Int4{Int32: int32(group_idInt), Valid: true},
+		StatusID:   pgtype.Int4{Int32: int32(status_idInt), Valid: true},
+	}
+
 	log.Printf("GetRequest: %s %s %s %s", name, physical_id, group_id, status_id)
-	return
-	// added_id, err := h.Storage.addSpace(context.Background(), name)
-	// if err != nil {
-	// 	http.Error(w, http.StatusText(500), 500)
-	// 	return
-	// }
-	// data := map[string]int32{
-	// 	"id": added_id,
-	// }
-	// jsonData, err := json.Marshal(data)
-	// if err != nil {
-	// 	http.Error(w, http.StatusText(500), 500)
-	// 	return
-	// }
-	// w.Write(jsonData)
+	added, err := h.Storage.AddSpace(context.Background(), params)
+	if err != nil {
+		http.Error(w, http.StatusText(500), 500)
+		return
+	}
+	jsonData, err := json.Marshal(added)
+	if err != nil {
+		http.Error(w, http.StatusText(500), 500)
+		return
+	}
+	w.Write(jsonData)
 }
 
 func (h *Handlers) DeleteSpace(w http.ResponseWriter, r *http.Request) {
-
+	id := chi.URLParam(r, "spaceID")
+	idInt, _ := strconv.Atoi(id)
+	deleted_id, err := h.Storage.DeleteSpace(context.Background(), int32(idInt))
+	log.Println(deleted_id, err)
+	if err != nil {
+		errMsg := err.Error()
+		http.Error(w, errMsg, 500)
+		return
+	}
+	response := struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{
+		Success: true,
+		Message: "Feature successfully deleted.",
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
 }
 
 func (h *Handlers) UpdateSpace(w http.ResponseWriter, r *http.Request) {
-	//name, features, status, pricing group
+	id := chi.URLParam(r, "spaceID")
+	idInt, _ := strconv.Atoi(id)
+	r.ParseForm()
+	name := r.Form.Get("name")
+	log.Printf("id: %s %s", id, name)
+	if name == "" {
+		http.Error(w, "name is required field", 422)
+		return
+	}
+	physical_id := r.Form.Get("physical_id")
+	physical_idInt, _ := strconv.Atoi(physical_id)
+	group_id := r.Form.Get("group_id")
+	group_idInt, _ := strconv.Atoi(group_id)
+	status_id := r.Form.Get("status_id")
+	status_idInt, _ := strconv.Atoi(status_id)
+
+	params := db.UpdateSpaceParams{
+		ID:         int32(idInt),
+		Name:       name,
+		PhysicalID: pgtype.Int4{Int32: int32(physical_idInt), Valid: true},
+		GroupID:    pgtype.Int4{Int32: int32(group_idInt), Valid: true},
+		StatusID:   pgtype.Int4{Int32: int32(status_idInt), Valid: true},
+	}
+
+	err := h.Storage.UpdateSpace(context.Background(), params)
+
+	if err != nil {
+		errMsg := err.Error()
+		http.Error(w, errMsg, 500)
+		return
+	}
+	response := struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{
+		Success: true,
+		Message: "Feature successfully updated.",
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
 }
 
 func (h *Handlers) AddFeature(w http.ResponseWriter, r *http.Request) {

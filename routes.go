@@ -13,16 +13,16 @@ func initRoutes(app *app.App) *chi.Mux {
 		r.Get("/", app.Handlers.GetFeatures)    //РЕАЛИЗОВАНО
 		r.Post("/add", app.Handlers.AddFeature) // РЕАЛИЗОВАНО
 		r.Route("/{featureID}", func(r chi.Router) {
-			r.Patch("/", app.Handlers.UpdateFeature)  // ВАСЯ!!
+			r.Put("/", app.Handlers.UpdateFeature)    // ВАСЯ!!
 			r.Delete("/", app.Handlers.DeleteFeature) // РЕАЛИЗОВАНО
 		})
 	})
 	r.Route("/spaces", func(r chi.Router) {
-		r.Get("/", app.Handlers.GetSpaces)    //РЕАЛИЗОВАНО
-		r.Post("/add", app.Handlers.AddSpace) // РЕАЛИЗОВАНО
-		r.Route("/{placeID}", func(r chi.Router) {
-			r.Patch("/", app.Handlers.UpdateSpace)  // ВАСЯ!!
-			r.Delete("/", app.Handlers.DeleteSpace) // РЕАЛИЗОВАНО
+		r.Get("/", app.Handlers.GetSpaces)
+		r.Post("/add", app.Handlers.AddSpace)
+		r.Route("/{spaceID}", func(r chi.Router) {
+			r.Put("/", app.Handlers.UpdateSpace)
+			r.Delete("/", app.Handlers.DeleteSpace)
 		})
 	})
 

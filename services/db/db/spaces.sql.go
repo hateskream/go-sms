@@ -64,15 +64,40 @@ func (q *Queries) AddReservation(ctx context.Context, arg AddReservationParams) 
 }
 
 const addSpace = `-- name: AddSpace :one
-INSERT INTO spaces (name)
-VALUES ($1) RETURNING id
+INSERT INTO spaces (name, physical_id, group_id, status_id)
+VALUES ($1,$2,$3,$4)
+RETURNING  name, physical_id, group_id, status_id
 `
 
-func (q *Queries) AddSpace(ctx context.Context, name string) (int32, error) {
-	row := q.db.QueryRow(ctx, addSpace, name)
-	var id int32
-	err := row.Scan(&id)
-	return id, err
+type AddSpaceParams struct {
+	Name       string      `json:"name"`
+	PhysicalID pgtype.Int4 `json:"physical_id"`
+	GroupID    pgtype.Int4 `json:"group_id"`
+	StatusID   pgtype.Int4 `json:"status_id"`
+}
+
+type AddSpaceRow struct {
+	Name       string      `json:"name"`
+	PhysicalID pgtype.Int4 `json:"physical_id"`
+	GroupID    pgtype.Int4 `json:"group_id"`
+	StatusID   pgtype.Int4 `json:"status_id"`
+}
+
+func (q *Queries) AddSpace(ctx context.Context, arg AddSpaceParams) (AddSpaceRow, error) {
+	row := q.db.QueryRow(ctx, addSpace,
+		arg.Name,
+		arg.PhysicalID,
+		arg.GroupID,
+		arg.StatusID,
+	)
+	var i AddSpaceRow
+	err := row.Scan(
+		&i.Name,
+		&i.PhysicalID,
+		&i.GroupID,
+		&i.StatusID,
+	)
+	return i, err
 }
 
 const addSpaceFeature = `-- name: AddSpaceFeature :exec
@@ -101,14 +126,15 @@ func (q *Queries) DeleteFeature(ctx context.Context, id int32) (int32, error) {
 	return id, err
 }
 
-const deleteSpace = `-- name: DeleteSpace :exec
+const deleteSpace = `-- name: DeleteSpace :one
 DELETE FROM spaces
-WHERE id = $1
+WHERE id = $1 RETURNING id
 `
 
-func (q *Queries) DeleteSpace(ctx context.Context, id int32) error {
-	_, err := q.db.Exec(ctx, deleteSpace, id)
-	return err
+func (q *Queries) DeleteSpace(ctx context.Context, id int32) (int32, error) {
+	row := q.db.QueryRow(ctx, deleteSpace, id)
+	err := row.Scan(&id)
+	return id, err
 }
 
 const getAllSpaces = `-- name: GetAllSpaces :many
@@ -330,6 +356,34 @@ type UpdateReservationStateParams struct {
 
 func (q *Queries) UpdateReservationState(ctx context.Context, arg UpdateReservationStateParams) error {
 	_, err := q.db.Exec(ctx, updateReservationState, arg.ID, arg.StatusID)
+	return err
+}
+
+const updateSpace = `-- name: UpdateSpace :exec
+UPDATE spaces
+  set name = $2,
+  physical_id = $3,
+  group_id = $4,
+  status_id = $5
+WHERE id = $1
+`
+
+type UpdateSpaceParams struct {
+	ID         int32       `json:"id"`
+	Name       string      `json:"name"`
+	PhysicalID pgtype.Int4 `json:"physical_id"`
+	GroupID    pgtype.Int4 `json:"group_id"`
+	StatusID   pgtype.Int4 `json:"status_id"`
+}
+
+func (q *Queries) UpdateSpace(ctx context.Context, arg UpdateSpaceParams) error {
+	_, err := q.db.Exec(ctx, updateSpace,
+		arg.ID,
+		arg.Name,
+		arg.PhysicalID,
+		arg.GroupID,
+		arg.StatusID,
+	)
 	return err
 }
 
