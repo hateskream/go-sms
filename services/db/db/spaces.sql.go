@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -99,19 +100,22 @@ func (q *Queries) AddSpace(ctx context.Context, arg AddSpaceParams) (AddSpaceRow
 	return i, err
 }
 
-const addSpaceFeature = `-- name: AddSpaceFeature :exec
-INSERT INTO space_features (space_id,Feature_id)
-VALUES ($1,$2)
+const assignSpaceFeature = `-- name: AssignSpaceFeature :one
+INSERT INTO space_features (space_id, feature_id, is_required) 
+VALUES ($1, $2, $3) RETURNING id
 `
 
-type AddSpaceFeatureParams struct {
-	SpaceID   pgtype.Int4 `json:"space_id"`
-	FeatureID pgtype.Int4 `json:"feature_id"`
+type AssignSpaceFeatureParams struct {
+	SpaceID    pgtype.Int4 `json:"space_id"`
+	FeatureID  pgtype.Int4 `json:"feature_id"`
+	IsRequired bool        `json:"is_required"`
 }
 
-func (q *Queries) AddSpaceFeature(ctx context.Context, arg AddSpaceFeatureParams) error {
-	_, err := q.db.Exec(ctx, addSpaceFeature, arg.SpaceID, arg.FeatureID)
-	return err
+func (q *Queries) AssignSpaceFeature(ctx context.Context, arg AssignSpaceFeatureParams) (int32, error) {
+	row := q.db.QueryRow(ctx, assignSpaceFeature, arg.SpaceID, arg.FeatureID, arg.IsRequired)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
 }
 
 const deleteFeature = `-- name: DeleteFeature :one
@@ -136,56 +140,14 @@ func (q *Queries) DeleteSpace(ctx context.Context, id int32) (int32, error) {
 	return id, err
 }
 
-const getAllSpaces = `-- name: GetAllSpaces :many
-SELECT
-    s.id,
-    s.name,
-    space_statuses.name as status,
-    CAST(string_agg(f.name, ',') as VARCHAR) AS features
-FROM
-    spaces AS s
-JOIN
-    space_features sf ON s.id = sf.space_id
-JOIN
-    features f ON sf.feature_id = f.id    
-JOIN
-    (SELECT DISTINCT ON (s.id) s.id, space_statuses.name
-     FROM spaces AS s
-     JOIN space_statuses ON s.status_id = space_statuses.id
-     ORDER BY s.id) AS space_statuses ON s.id = space_statuses.id
-GROUP BY s.id, space_statuses.name
+const deleteSpaceFeatures = `-- name: DeleteSpaceFeatures :exec
+DELETE FROM space_features
+WHERE space_id = $1
 `
 
-type GetAllSpacesRow struct {
-	ID       int32  `json:"id"`
-	Name     string `json:"name"`
-	Status   string `json:"status"`
-	Features string `json:"features"`
-}
-
-func (q *Queries) GetAllSpaces(ctx context.Context) ([]GetAllSpacesRow, error) {
-	rows, err := q.db.Query(ctx, getAllSpaces)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetAllSpacesRow
-	for rows.Next() {
-		var i GetAllSpacesRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Status,
-			&i.Features,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) DeleteSpaceFeatures(ctx context.Context, spaceID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, deleteSpaceFeatures, spaceID)
+	return err
 }
 
 const getCardByNumber = `-- name: GetCardByNumber :one
@@ -227,9 +189,54 @@ func (q *Queries) GetFeatures(ctx context.Context) ([]Feature, error) {
 	return items, nil
 }
 
+const getSpacePrices = `-- name: GetSpacePrices :many
+SELECT
+    s.id,    
+    tpp.rate
+FROM
+    spaces AS s
+JOIN
+    pricing_groups pg ON s.group_id = pg.id
+JOIN
+    time_pricing_policy tpp ON tpp.group_id = pg.id   
+WHERE
+  tpp.day_of_week = $1 AnD tpp.hour = $2     
+GROUP BY s.id, tpp.rate
+`
+
+type GetSpacePricesParams struct {
+	DayOfWeek int16 `json:"day_of_week"`
+	Hour      int16 `json:"hour"`
+}
+
+type GetSpacePricesRow struct {
+	ID   int32   `json:"id"`
+	Rate float32 `json:"rate"`
+}
+
+func (q *Queries) GetSpacePrices(ctx context.Context, arg GetSpacePricesParams) ([]GetSpacePricesRow, error) {
+	rows, err := q.db.Query(ctx, getSpacePrices, arg.DayOfWeek, arg.Hour)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSpacePricesRow
+	for rows.Next() {
+		var i GetSpacePricesRow
+		if err := rows.Scan(&i.ID, &i.Rate); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSpaceStatuses = `-- name: GetSpaceStatuses :many
-Select id, name
-From space_statuses
+SELECT id, name
+FROM space_statuses
 `
 
 func (q *Queries) GetSpaceStatuses(ctx context.Context) ([]SpaceStatus, error) {
@@ -253,69 +260,52 @@ func (q *Queries) GetSpaceStatuses(ctx context.Context) ([]SpaceStatus, error) {
 }
 
 const getSpaces = `-- name: GetSpaces :many
-SELECT id, name, physical_id, group_id, status_id, has_camera
-FROM spaces
-ORDER BY id
+SELECT
+    s.id,
+    s.name,
+    space_statuses.name AS status,        
+    COALESCE(CAST(string_agg(CASE WHEN sf.is_required THEN f.name END, ',') AS VARCHAR), '') AS required_features,
+    COALESCE(CAST(string_agg(f.name, ',') AS VARCHAR), '') AS features
+FROM
+    spaces AS s
+JOIN
+    space_features sf ON s.id = sf.space_id                
+JOIN
+    features f ON sf.feature_id = f.id    
+JOIN
+    (
+        SELECT DISTINCT ON (s.id) s.id, space_statuses.name
+        FROM spaces AS s
+        JOIN space_statuses ON s.status_id = space_statuses.id
+        ORDER BY s.id
+    ) AS space_statuses ON s.id = space_statuses.id  
+GROUP BY s.id, space_statuses.name
 `
 
-func (q *Queries) GetSpaces(ctx context.Context) ([]Space, error) {
+type GetSpacesRow struct {
+	ID               int32       `json:"id"`
+	Name             string      `json:"name"`
+	Status           string      `json:"status"`
+	RequiredFeatures interface{} `json:"required_features"`
+	Features         interface{} `json:"features"`
+}
+
+func (q *Queries) GetSpaces(ctx context.Context) ([]GetSpacesRow, error) {
 	rows, err := q.db.Query(ctx, getSpaces)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Space
+	var items []GetSpacesRow
 	for rows.Next() {
-		var i Space
+		var i GetSpacesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
-			&i.PhysicalID,
-			&i.GroupID,
-			&i.StatusID,
-			&i.HasCamera,
+			&i.Status,
+			&i.RequiredFeatures,
+			&i.Features,
 		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getSpacesByFeatureList = `-- name: GetSpacesByFeatureList :many
-SELECT s.id, s.name
-FROM 
-  spaces s
-JOIN 
-  space_features sf ON s.id = sf.space_id
-WHERE sf.feature_id = ANY($1::int[]) AND s.status_id = 1
-GROUP BY s.id
-HAVING  COUNT(DISTINCT sf.feature_id) = $2::int
-`
-
-type GetSpacesByFeatureListParams struct {
-	FeatureList  []int32 `json:"feature_list"`
-	FeatureCount int32   `json:"feature_count"`
-}
-
-type GetSpacesByFeatureListRow struct {
-	ID   int32  `json:"id"`
-	Name string `json:"name"`
-}
-
-func (q *Queries) GetSpacesByFeatureList(ctx context.Context, arg GetSpacesByFeatureListParams) ([]GetSpacesByFeatureListRow, error) {
-	rows, err := q.db.Query(ctx, getSpacesByFeatureList, arg.FeatureList, arg.FeatureCount)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetSpacesByFeatureListRow
-	for rows.Next() {
-		var i GetSpacesByFeatureListRow
-		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -386,10 +376,11 @@ func (q *Queries) UpdateSpace(ctx context.Context, arg UpdateSpaceParams) error 
 	return err
 }
 
-const updateSpaceStatus = `-- name: UpdateSpaceStatus :exec
+const updateSpaceStatus = `-- name: UpdateSpaceStatus :one
 UPDATE spaces
   set status_id = $3
 WHERE spaces.id = $1 AND spaces.status_id = $2
+RETURNING id
 `
 
 type UpdateSpaceStatusParams struct {
@@ -398,7 +389,9 @@ type UpdateSpaceStatusParams struct {
 	StatusID_2 pgtype.Int4 `json:"status_id_2"`
 }
 
-func (q *Queries) UpdateSpaceStatus(ctx context.Context, arg UpdateSpaceStatusParams) error {
-	_, err := q.db.Exec(ctx, updateSpaceStatus, arg.ID, arg.StatusID, arg.StatusID_2)
-	return err
+func (q *Queries) UpdateSpaceStatus(ctx context.Context, arg UpdateSpaceStatusParams) (int32, error) {
+	row := q.db.QueryRow(ctx, updateSpaceStatus, arg.ID, arg.StatusID, arg.StatusID_2)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
 }

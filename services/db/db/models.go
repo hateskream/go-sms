@@ -18,6 +18,11 @@ type Feature struct {
 	Name string `json:"name"`
 }
 
+type PricingGroup struct {
+	ID   int32  `json:"id"`
+	Name string `json:"name"`
+}
+
 type ReservationStatus struct {
 	ID   int32  `json:"id"`
 	Name string `json:"name"`
@@ -33,17 +38,10 @@ type Space struct {
 }
 
 type SpaceFeature struct {
-	ID        int32       `json:"id"`
-	SpaceID   pgtype.Int4 `json:"space_id"`
-	FeatureID pgtype.Int4 `json:"feature_id"`
-}
-
-type SpaceGroup struct {
-	ID                  int32       `json:"id"`
-	Name                string      `json:"name"`
-	ParkingPrice        float32     `json:"parking_price"`
-	BookingStaticPrice  float32     `json:"booking_static_price"`
-	TimePricingPolicyID pgtype.Int4 `json:"time_pricing_policy_id"`
+	ID         int32       `json:"id"`
+	SpaceID    pgtype.Int4 `json:"space_id"`
+	FeatureID  pgtype.Int4 `json:"feature_id"`
+	IsRequired bool        `json:"is_required"`
 }
 
 type SpaceOccupancy struct {
@@ -78,4 +76,5 @@ type TimePricingPolicy struct {
 	Rate      float32 `json:"rate"`
 	Hour      int16   `json:"hour"`
 	DayOfWeek int16   `json:"day_of_week"`
+	GroupID   int32   `json:"group_id"`
 }

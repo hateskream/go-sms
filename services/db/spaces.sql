@@ -4,15 +4,6 @@ VALUES ($1,$2,$3,$4)
 RETURNING  name, physical_id, group_id, status_id;
 
 
--- name: AddSpaceFeature :exec
-INSERT INTO space_features (space_id,Feature_id)
-VALUES ($1,$2);
-
--- name: GetSpaces :many
-SELECT *
-FROM spaces
-ORDER BY id;
-
 -- name: DeleteSpace :one
 DELETE FROM spaces
 WHERE id = $1 RETURNING id;
@@ -43,40 +34,47 @@ WHERE id = $1;
 DELETE FROM features
 WHERE id = $1 RETURNING id;
 
--- name: GetAllSpaces :many
+-- name: GetSpaces :many
 SELECT
     s.id,
     s.name,
-    space_statuses.name as status,
-    CAST(string_agg(f.name, ',') as VARCHAR) AS features
+    space_statuses.name AS status,        
+    COALESCE(CAST(string_agg(CASE WHEN sf.is_required THEN f.name END, ',') AS VARCHAR), '') AS required_features,
+    COALESCE(CAST(string_agg(f.name, ',') AS VARCHAR), '') AS features
 FROM
     spaces AS s
 JOIN
-    space_features sf ON s.id = sf.space_id
+    space_features sf ON s.id = sf.space_id                
 JOIN
     features f ON sf.feature_id = f.id    
 JOIN
-    (SELECT DISTINCT ON (s.id) s.id, space_statuses.name
-     FROM spaces AS s
-     JOIN space_statuses ON s.status_id = space_statuses.id
-     ORDER BY s.id) AS space_statuses ON s.id = space_statuses.id
+    (
+        SELECT DISTINCT ON (s.id) s.id, space_statuses.name
+        FROM spaces AS s
+        JOIN space_statuses ON s.status_id = space_statuses.id
+        ORDER BY s.id
+    ) AS space_statuses ON s.id = space_statuses.id  
 GROUP BY s.id, space_statuses.name;
 
+-- name: GetSpacePrices :many
+SELECT
+    s.id,    
+    tpp.rate
+FROM
+    spaces AS s
+JOIN
+    pricing_groups pg ON s.group_id = pg.id
+JOIN
+    time_pricing_policy tpp ON tpp.group_id = pg.id   
+WHERE
+  tpp.day_of_week = $1 AnD tpp.hour = $2     
+GROUP BY s.id, tpp.rate;
 
--- name: GetSpacesByFeatureList :many
-SELECT s.id, s.name
-FROM 
-  spaces s
-JOIN 
-  space_features sf ON s.id = sf.space_id
-WHERE sf.feature_id = ANY(sqlc.arg(feature_list)::int[]) AND s.status_id = 1
-GROUP BY s.id
-HAVING  COUNT(DISTINCT sf.feature_id) = sqlc.arg(feature_count)::int; 
-
--- name: UpdateSpaceStatus :exec
+-- name: UpdateSpaceStatus :one
 UPDATE spaces
   set status_id = $3
-WHERE spaces.id = $1 AND spaces.status_id = $2;
+WHERE spaces.id = $1 AND spaces.status_id = $2
+RETURNING id;
 
 -- name: GetCardByNumber :one
 SELECT cars.id
@@ -97,6 +95,13 @@ UPDATE space_reservations
 WHERE space_reservations.id = $1;
 
 -- name: GetSpaceStatuses :many
-Select *
-From space_statuses;
+SELECT *
+FROM space_statuses;
 
+-- name: DeleteSpaceFeatures :exec
+DELETE FROM space_features
+WHERE space_id = $1;
+
+-- name: AssignSpaceFeature :one
+INSERT INTO space_features (space_id, feature_id, is_required) 
+VALUES ($1, $2, $3) RETURNING id;

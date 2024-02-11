@@ -6,27 +6,33 @@ import (
 	"log"
 	"space-management-system/services/db/db"
 	"sync"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type SpacesInterface interface {
+type SpaceWithPrice struct {
+	db.GetSpacesRow
+	Price float32 `json:"price"`
+}
+
+type SpaceFeature struct {
+	Name       string
+	IsRequired bool
 }
 
 type StorageManager interface {
-	GetAllSpaces(ctx context.Context) ([]db.GetAllSpacesRow, error)
-	AddSpace(ctx context.Context, arg db.AddSpaceParams) (db.AddSpaceRow, error)
-	UpdateSpace(ctx context.Context, arg db.UpdateSpaceParams) error
-	DeleteSpace(ctx context.Context, id int32) (int32, error)
-	GetSpacesByFeatureList(ctx context.Context, arg db.GetSpacesByFeatureListParams) ([]db.GetSpacesByFeatureListRow, error)
+	GetSpaces(ctx context.Context) ([]db.GetSpacesRow, error)
 	GetFeatures(ctx context.Context) ([]db.Feature, error)
+	GetSpacePrices(ctx context.Context, arg db.GetSpacePricesParams) ([]db.GetSpacePricesRow, error)
+	GetSpaceStatuses(ctx context.Context) ([]db.SpaceStatus, error)
+	UpdateSpaceStatus(ctx context.Context, arg db.UpdateSpaceStatusParams) (int32, error)
+	DeleteSpaceFeatures(ctx context.Context, spaceID pgtype.Int4) error
+	AssignSpaceFeature(ctx context.Context, arg db.AssignSpaceFeatureParams) (int32, error)
+
 	AddFeature(ctx context.Context, name string) (int32, error)
 	DeleteFeature(ctx context.Context, id int32) (int32, error)
-	UpdateFeature(ctx context.Context, arg db.UpdateFeatureParams) error
 	AddCardNumber(ctx context.Context, number string) (int32, error)
 	GetCardByNumber(ctx context.Context, number string) (int32, error)
-	UpdateSpaceStatus(ctx context.Context, arg db.UpdateSpaceStatusParams) error
-	AddReservation(ctx context.Context, arg db.AddReservationParams) (int32, error)
-	UpdateReservationState(ctx context.Context, arg db.UpdateReservationStateParams) error
-	GetSpaceStatuses(ctx context.Context) ([]db.SpaceStatus, error)
 }
 
 type HardwareManager interface {
@@ -36,7 +42,10 @@ type HardwareManager interface {
 type SpaceManager interface {
 	SetApp(*App)
 	GetFeatures() ([]db.Feature, error)
-	GetSpaces() ([]db.Space, error)
+	GetSpaces() ([]SpaceWithPrice, error)
+	UpdateSpacePrices() error
+	UpdateSpaceStatus(space_id int32, curStatus string, newStatus string) error
+	UpdateSpaceFeatures(space_id int32, features []SpaceFeature) error
 }
 
 type ReservationsManager interface {
