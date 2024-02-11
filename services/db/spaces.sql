@@ -4,9 +4,41 @@ VALUES ($1,$2,$3,$4)
 RETURNING  name, physical_id, group_id, status_id;
 
 
+-- 
+
 -- name: AddSpaceFeature :exec
 INSERT INTO space_features (space_id,Feature_id)
 VALUES ($1,$2);
+
+-- name: AddPricingGroup :one
+INSERT INTO pricing_groups (name)
+VALUES ($1) RETURNING id;
+
+-- name: GeneratTimePricingPolicy :exec
+INSERT INTO time_pricing_policy (rate, hour, day_of_week, group_id)
+SELECT $2, hour, day_of_week, $1
+FROM generate_series(1, 8) AS day_of_week
+CROSS JOIN generate_series(1, 24) AS hour;
+
+-- name: DeletePricingGroup :one
+DELETE FROM pricing_groups
+WHERE id = $1 RETURNING id;
+
+-- name: CleanTimePricingPolicy :exec
+DELETE FROM time_pricing_policy
+WHERE group_id = $1;
+
+
+-- name: UpdatePricingGroups :exec
+UPDATE pricing_groups
+  set name = $2
+  WHERE id = $1;
+
+-- name: UpdatePricingPolicy :exec
+UPDATE time_pricing_policy
+  set rate = $2
+  WHERE ID = $1;
+  
 
 -- name: GetSpaces :many
 SELECT *

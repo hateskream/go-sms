@@ -1,4 +1,3 @@
-
 CREATE TABLE "public"."cars" (
     "id" int4 NOT NULL DEFAULT nextval('cars_id_seq'::regclass),
     "number" varchar DEFAULT 'NULL'::character varying,
@@ -8,6 +7,12 @@ CREATE TABLE "public"."cars" (
 CREATE TABLE "public"."features" (
     "id" int4 NOT NULL DEFAULT nextval('features_id_seq'::regclass),
     "name" varchar NOT NULL DEFAULT ''::character varying,
+    PRIMARY KEY ("id")
+);
+
+CREATE TABLE "public"."pricing_groups" (
+    "id" int4 NOT NULL DEFAULT nextval('space_groups_id_seq'::regclass),
+    "name" varchar NOT NULL DEFAULT 'EMPTY'::character varying,
     PRIMARY KEY ("id")
 );
 
@@ -21,15 +26,7 @@ CREATE TABLE "public"."space_features" (
     "id" int4 NOT NULL DEFAULT nextval('untitled_table_214_id_seq'::regclass),
     "space_id" int4,
     "feature_id" int4,
-    PRIMARY KEY ("id")
-);
-
-CREATE TABLE "public"."space_groups" (
-    "id" int4 NOT NULL DEFAULT nextval('space_groups_id_seq'::regclass),
-    "name" varchar NOT NULL DEFAULT 'EMPTY'::character varying,
-    "parking_price" float4 NOT NULL DEFAULT 0,
-    "booking_static_price" float4 NOT NULL DEFAULT 0,
-    "time_pricing_policy_id" int4,
+    "is_required" bool NOT NULL DEFAULT false,
     PRIMARY KEY ("id")
 );
 
@@ -78,16 +75,17 @@ CREATE TABLE "public"."time_pricing_policy" (
     "rate" float4 NOT NULL DEFAULT 0,
     "hour" int2 NOT NULL DEFAULT 0,
     "day_of_week" int2 NOT NULL DEFAULT 0,
+    "group_id" int4 NOT NULL DEFAULT 1,
     PRIMARY KEY ("id")
 );
 
 ALTER TABLE "public"."space_features" ADD FOREIGN KEY ("feature_id") REFERENCES "public"."features"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "public"."space_features" ADD FOREIGN KEY ("space_id") REFERENCES "public"."spaces"("id");
-ALTER TABLE "public"."space_groups" ADD FOREIGN KEY ("time_pricing_policy_id") REFERENCES "public"."time_pricing_policy"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "public"."space_occupancy" ADD FOREIGN KEY ("car_id") REFERENCES "public"."cars"("id");
 ALTER TABLE "public"."space_occupancy" ADD FOREIGN KEY ("space_id") REFERENCES "public"."spaces"("id");
-ALTER TABLE "public"."space_reservations" ADD FOREIGN KEY ("car_id") REFERENCES "public"."cars"("id");
-ALTER TABLE "public"."space_reservations" ADD FOREIGN KEY ("status_id") REFERENCES "public"."reservation_statuses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "public"."space_reservations" ADD FOREIGN KEY ("space_id") REFERENCES "public"."spaces"("id");
-ALTER TABLE "public"."spaces" ADD FOREIGN KEY ("group_id") REFERENCES "public"."space_groups"("id");
+ALTER TABLE "public"."space_reservations" ADD FOREIGN KEY ("status_id") REFERENCES "public"."reservation_statuses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."space_reservations" ADD FOREIGN KEY ("car_id") REFERENCES "public"."cars"("id");
 ALTER TABLE "public"."spaces" ADD FOREIGN KEY ("status_id") REFERENCES "public"."space_statuses"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."spaces" ADD FOREIGN KEY ("group_id") REFERENCES "public"."pricing_groups"("id");
+ALTER TABLE "public"."time_pricing_policy" ADD FOREIGN KEY ("group_id") REFERENCES "public"."pricing_groups"("id") ON UPDATE CASCADE;

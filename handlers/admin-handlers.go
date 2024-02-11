@@ -191,27 +191,107 @@ func (h *Handlers) UpdateFeature(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) AddPricingPolicy(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func (h *Handlers) DeletePricingPolicy(w http.ResponseWriter, r *http.Request) {
-
-}
-
 func (h *Handlers) UpdatePricingPolicy(w http.ResponseWriter, r *http.Request) {
+	// id := chi.URLParam(r, "featureID")
+	// idInt, _ := strconv.Atoi(id)
 
+	// r.ParseForm()
+	// name := r.Form.Get("name")
 }
 
 func (h *Handlers) AddPricingGroup(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	name := r.Form.Get("name")
+	group_id, err := h.Storage.AddPricingGroup(context.Background(), name)
+
+	if err != nil {
+		errMsg := err.Error()
+		http.Error(w, errMsg, 500)
+		return
+	}
+	rate := 1
+
+	params := db.GeneratTimePricingPolicyParams{
+		GroupID: int32(group_id),
+		Rate:    float32(rate),
+	}
+
+	errGenerate := h.Storage.GeneratTimePricingPolicy(context.Background(), params)
+	if errGenerate != nil {
+		errGenerateMsg := errGenerate.Error()
+		http.Error(w, errGenerateMsg, 500)
+		return
+	}
+
+	response := struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{
+		Success: true,
+		Message: "Group successfully added.",
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
 
 }
 
 func (h *Handlers) DeletePricingGroup(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "pricing_groupID")
+	idInt, _ := strconv.Atoi(id)
 
+	errClean := h.Storage.CleanTimePricingPolicy(context.Background(), int32(idInt))
+	if errClean != nil {
+		errMsg := errClean.Error()
+		http.Error(w, errMsg, 500)
+		return
+	}
+
+	group_id, err := h.Storage.DeletePricingGroup(context.Background(), int32(idInt))
+	if err != nil {
+		errMsg := err.Error()
+		http.Error(w, errMsg, 500)
+		return
+	}
+	log.Printf("Deleted: %d", group_id)
+	response := struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{
+		Success: true,
+		Message: "Group successfully deleted.",
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
 }
 
-func (h *Handlers) UpdatePricingGroup(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) UpdatePricingGroups(w http.ResponseWriter, r *http.Request) {
+
+	id := chi.URLParam(r, "pricing_groupID")
+	idInt, _ := strconv.Atoi(id)
+
+	r.ParseForm()
+	name := r.Form.Get("name")
+
+	params := db.UpdatePricingGroupsParams{
+		ID:   int32(idInt),
+		Name: string(name),
+	}
+	log.Println(params)
+	err := h.Storage.UpdatePricingGroups(context.Background(), params)
+	if err != nil {
+		errMsg := err.Error()
+		http.Error(w, errMsg, 500)
+		return
+	}
+	response := struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{
+		Success: true,
+		Message: "Group successfully updated.",
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
 
 }
 

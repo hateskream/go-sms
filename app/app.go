@@ -22,12 +22,11 @@ type HandlersInterface interface {
 	AddFeature(w http.ResponseWriter, r *http.Request)
 	DeleteFeature(w http.ResponseWriter, r *http.Request)
 	UpdateFeature(w http.ResponseWriter, r *http.Request)
-	AddPricingPolicy(w http.ResponseWriter, r *http.Request)
-	DeletePricingPolicy(w http.ResponseWriter, r *http.Request)
+
 	UpdatePricingPolicy(w http.ResponseWriter, r *http.Request)
 	AddPricingGroup(w http.ResponseWriter, r *http.Request)
 	DeletePricingGroup(w http.ResponseWriter, r *http.Request)
-	UpdatePricingGroup(w http.ResponseWriter, r *http.Request)
+	UpdatePricingGroups(w http.ResponseWriter, r *http.Request)
 	SetLocker(w http.ResponseWriter, r *http.Request)
 	GetActiveReservations(w http.ResponseWriter, r *http.Request)
 	GetReservationHistory(w http.ResponseWriter, r *http.Request)
@@ -50,6 +49,13 @@ type StorageInterface interface {
 	AddReservation(ctx context.Context, arg db.AddReservationParams) (int32, error)
 	UpdateReservationState(ctx context.Context, arg db.UpdateReservationStateParams) error
 	GetSpaceStatuses(ctx context.Context) ([]db.SpaceStatus, error)
+
+	AddPricingGroup(ctx context.Context, name string) (int32, error)
+	GeneratTimePricingPolicy(ctx context.Context, arg db.GeneratTimePricingPolicyParams) error
+	DeletePricingGroup(ctx context.Context, id int32) (int32, error)
+	CleanTimePricingPolicy(ctx context.Context, id int32) error
+	UpdatePricingPolicy(ctx context.Context, arg db.UpdatePricingPolicyParams) error
+	UpdatePricingGroups(ctx context.Context, arg db.UpdatePricingGroupsParams) error
 }
 
 type HardwareInterface interface {
