@@ -53,6 +53,11 @@ func (h *Handlers) AddSpace(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) DeleteSpace(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "spaceID")
+	if id == "" {
+		errMsg := "Id is required"
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+		return
+	}
 	idInt, _ := strconv.Atoi(id)
 	deleted_id, err := h.Storage.DeleteSpace(context.Background(), int32(idInt))
 	log.Println(deleted_id, err)
@@ -74,6 +79,11 @@ func (h *Handlers) DeleteSpace(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) UpdateSpace(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "spaceID")
+	if id == "" {
+		errMsg := "Id is required"
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+		return
+	}
 	idInt, _ := strconv.Atoi(id)
 	r.ParseForm()
 	name := r.Form.Get("name")
@@ -140,6 +150,12 @@ func (h *Handlers) AddFeature(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) DeleteFeature(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "featureID")
+
+	if id == "" {
+		errMsg := "Id is required"
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+		return
+	}
 	idInt, _ := strconv.Atoi(id)
 	deleted_id, err := h.Storage.DeleteFeature(context.Background(), int32(idInt))
 	log.Println(deleted_id, err)
@@ -162,6 +178,13 @@ func (h *Handlers) DeleteFeature(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) UpdateFeature(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "featureID")
+
+	if id == "" {
+		errMsg := "Id is required"
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+		return
+	}
+
 	idInt, _ := strconv.Atoi(id)
 
 	r.ParseForm()
@@ -237,6 +260,11 @@ func (h *Handlers) AddPricingGroup(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) DeletePricingGroup(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "pricing_groupID")
+	if id == "" {
+		errMsg := "Id is required"
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+		return
+	}
 	idInt, _ := strconv.Atoi(id)
 
 	errClean := h.Storage.CleanTimePricingPolicy(context.Background(), int32(idInt))
@@ -267,6 +295,11 @@ func (h *Handlers) DeletePricingGroup(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) UpdatePricingGroups(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "pricing_groupID")
+	if id == "" {
+		errMsg := "Id is required"
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+		return
+	}
 	idInt, _ := strconv.Atoi(id)
 
 	r.ParseForm()
