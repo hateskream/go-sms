@@ -49,20 +49,45 @@ func UpdateSpaceFeature(w http.ResponseWriter, r *http.Request) {
 // 		StatusID:   pgtype.Int4{Int32: int32(status_idInt), Valid: true},
 // 	}
 
-// 	log.Printf("GetRequest: %s %s %s %s", name, physical_id, group_id, status_id)
-// 	added, err := h.Storage.AddSpace(context.Background(), params)
-// 	if err != nil {
-// 		http.Error(w, http.StatusText(500), 500)
-// 		return
-// 	}
-// 	jsonData, err := json.Marshal(added)
-// 	if err != nil {
-// 		http.Error(w, http.StatusText(500), 500)
-// 		return
-// 	}
-// 	w.Write(jsonData)
-// }
+	log.Printf("GetRequest: %s %s %s %s", name, physical_id, group_id, status_id)
+	added, err := h.Storage.AddSpace(context.Background(), params)
+	if err != nil {
+		http.Error(w, http.StatusText(500), 500)
+		return
+	}
+	jsonData, err := json.Marshal(added)
+	if err != nil {
+		http.Error(w, http.StatusText(500), 500)
+		return
+	}
+	w.Write(jsonData)
+}
 
+func (h *Handlers) DeleteSpace(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "spaceID")
+	if id == "" {
+		errMsg := "Id is required"
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+		return
+	}
+	idInt, _ := strconv.Atoi(id)
+	deleted_id, err := h.Storage.DeleteSpace(context.Background(), int32(idInt))
+	log.Println(deleted_id, err)
+	if err != nil {
+		errMsg := err.Error()
+		http.Error(w, errMsg, 500)
+		return
+	}
+	response := struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{
+		Success: true,
+		Message: "Feature successfully deleted.",
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
+}
 // func DeleteSpace(w http.ResponseWriter, r *http.Request) {
 // 	id := chi.URLParam(r, "spaceID")
 // 	idInt, _ := strconv.Atoi(id)
@@ -84,8 +109,13 @@ func UpdateSpaceFeature(w http.ResponseWriter, r *http.Request) {
 // 	w.Write(jsonData)
 // }
 
-// func UpdateSpace(w http.ResponseWriter, r *http.Request) {
+// func (h *Handlers) UpdateSpace(w http.ResponseWriter, r *http.Request) {
 // 	id := chi.URLParam(r, "spaceID")
+// 	if id == "" {
+// 		errMsg := "Id is required"
+// 		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+// 		return
+// 	}
 // 	idInt, _ := strconv.Atoi(id)
 // 	r.ParseForm()
 // 	name := r.Form.Get("name")
@@ -154,6 +184,18 @@ func UpdateSpaceFeature(w http.ResponseWriter, r *http.Request) {
 func DeleteFeature(w http.ResponseWriter, r *http.Request) {
 	storage, _ := app.GetStorage()
 	id := chi.URLParam(r, "featureID")
+
+	if id == "" {
+		errMsg := "Id is required"
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+		return
+	}
+	w.Write(jsonData)
+}
+
+func DeleteFeature(w http.ResponseWriter, r *http.Request) {
+	storage, _ := app.GetStorage()
+	id := chi.URLParam(r, "featureID")
 	idInt, _ := strconv.Atoi(id)
 	deleted_id, err := storage.DeleteFeature(context.Background(), int32(idInt))
 	log.Println(deleted_id, err)
@@ -173,35 +215,35 @@ func DeleteFeature(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
-// func UpdateFeature(w http.ResponseWriter, r *http.Request) {
-// 	storage, _ := app.GetStorage()
+// func (h *Handlers) UpdateFeature(w http.ResponseWriter, r *http.Request) {
+
 // 	id := chi.URLParam(r, "featureID")
 // 	idInt, _ := strconv.Atoi(id)
 
-// 	r.ParseForm()
-// 	name := r.Form.Get("name")
+	// 	r.ParseForm()
+	// 	name := r.Form.Get("name")
 
-// 	params := db.UpdateFeatureParams{
-// 		ID:   int32(idInt),
-// 		Name: name,
-// 	}
-// 	err := storage.UpdateFeature(context.Background(), params)
+	// 	params := db.UpdateFeatureParams{
+	// 		ID:   int32(idInt),
+	// 		Name: name,
+	// 	}
+	// 	err := storage.UpdateFeature(context.Background(), params)
 
-// 	if err != nil {
-// 		errMsg := err.Error()
-// 		http.Error(w, errMsg, 500)
-// 		return
-// 	}
+	// 	if err != nil {
+	// 		errMsg := err.Error()
+	// 		http.Error(w, errMsg, 500)
+	// 		return
+	// 	}
 
-// 	response := struct {
-// 		Success bool   `json:"success"`
-// 		Message string `json:"message"`
-// 	}{
-// 		Success: true,
-// 		Message: "Feature successfully updated.",
-// 	}
-// 	jsonData, _ := json.Marshal(response)
-// 	w.Write(jsonData)
+	// 	response := struct {
+	// 		Success bool   `json:"success"`
+	// 		Message string `json:"message"`
+	// 	}{
+	// 		Success: true,
+	// 		Message: "Feature successfully updated.",
+	// 	}
+	// 	jsonData, _ := json.Marshal(response)
+	// 	w.Write(jsonData)
 
 // }
 
@@ -214,13 +256,116 @@ func DeletePricingPolicy(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdatePricingPolicy(w http.ResponseWriter, r *http.Request) {
+	// id := chi.URLParam(r, "featureID")
+	// idInt, _ := strconv.Atoi(id)
 
+	// r.ParseForm()
+	// name := r.Form.Get("name")
 }
 
 func AddPricingGroup(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	name := r.Form.Get("name")
+	group_id, err := h.Storage.AddPricingGroup(context.Background(), name)
+
+	if err != nil {
+		errMsg := err.Error()
+		http.Error(w, errMsg, 500)
+		return
+	}
+	rate := 1
+
+	params := db.GeneratTimePricingPolicyParams{
+		GroupID: int32(group_id),
+		Rate:    float32(rate),
+	}
+
+	errGenerate := h.Storage.GeneratTimePricingPolicy(context.Background(), params)
+	if errGenerate != nil {
+		errGenerateMsg := errGenerate.Error()
+		http.Error(w, errGenerateMsg, 500)
+		return
+	}
+
+	response := struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{
+		Success: true,
+		Message: "Group successfully added.",
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
 
 }
 
+func (h *Handlers) DeletePricingGroup(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "pricing_groupID")
+	if id == "" {
+		errMsg := "Id is required"
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+		return
+	}
+	idInt, _ := strconv.Atoi(id)
+
+	errClean := h.Storage.CleanTimePricingPolicy(context.Background(), int32(idInt))
+	if errClean != nil {
+		errMsg := errClean.Error()
+		http.Error(w, errMsg, 500)
+		return
+	}
+
+	group_id, err := h.Storage.DeletePricingGroup(context.Background(), int32(idInt))
+	if err != nil {
+		errMsg := err.Error()
+		http.Error(w, errMsg, 500)
+		return
+	}
+	log.Printf("Deleted: %d", group_id)
+	response := struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{
+		Success: true,
+		Message: "Group successfully deleted.",
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
+}
+
+func (h *Handlers) UpdatePricingGroups(w http.ResponseWriter, r *http.Request) {
+
+	id := chi.URLParam(r, "pricing_groupID")
+	if id == "" {
+		errMsg := "Id is required"
+		http.Error(w, errMsg, http.StatusUnprocessableEntity)
+		return
+	}
+	idInt, _ := strconv.Atoi(id)
+
+	r.ParseForm()
+	name := r.Form.Get("name")
+
+	params := db.UpdatePricingGroupsParams{
+		ID:   int32(idInt),
+		Name: string(name),
+	}
+	log.Println(params)
+	err := h.Storage.UpdatePricingGroups(context.Background(), params)
+	if err != nil {
+		errMsg := err.Error()
+		http.Error(w, errMsg, 500)
+		return
+	}
+	response := struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}{
+		Success: true,
+		Message: "Group successfully updated.",
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
 func DeletePricingGroup(w http.ResponseWriter, r *http.Request) {
 
 }

@@ -33,6 +33,13 @@ type StorageManager interface {
 	DeleteFeature(ctx context.Context, id int32) (int32, error)
 	AddCardNumber(ctx context.Context, number string) (int32, error)
 	GetCardByNumber(ctx context.Context, number string) (int32, error)
+
+	AddPricingGroup(ctx context.Context, name string) (int32, error)
+	GeneratTimePricingPolicy(ctx context.Context, arg db.GeneratTimePricingPolicyParams) error
+	DeletePricingGroup(ctx context.Context, id int32) (int32, error)
+	CleanTimePricingPolicy(ctx context.Context, id int32) error
+	UpdatePricingPolicy(ctx context.Context, arg db.UpdatePricingPolicyParams) error
+	UpdatePricingGroups(ctx context.Context, arg db.UpdatePricingGroupsParams) error
 }
 
 type HardwareManager interface {
