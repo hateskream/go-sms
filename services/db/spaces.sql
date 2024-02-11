@@ -1,6 +1,8 @@
 -- name: AddSpace :one
-INSERT INTO spaces (name)
-VALUES ($1) RETURNING id;
+INSERT INTO spaces (name, physical_id, group_id, status_id)
+VALUES ($1,$2,$3,$4)
+RETURNING  name, physical_id, group_id, status_id;
+
 
 -- name: AddSpaceFeature :exec
 INSERT INTO space_features (space_id,Feature_id)
@@ -11,8 +13,16 @@ SELECT *
 FROM spaces
 ORDER BY id;
 
--- name: DeleteSpace :exec
+-- name: DeleteSpace :one
 DELETE FROM spaces
+WHERE id = $1 RETURNING id;
+
+-- name: UpdateSpace :exec
+UPDATE spaces
+  set name = $2,
+  physical_id = $3,
+  group_id = $4,
+  status_id = $5
 WHERE id = $1;
 
 -- name: GetFeatures :many

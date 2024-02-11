@@ -17,5 +17,14 @@ func initRoutes() *chi.Mux {
 			r.Delete("/", handlers.DeleteFeature) // РЕАЛИЗОВАНО
 		})
 	})
+	r.Route("/spaces", func(r chi.Router) {
+		r.Get("/", app.Handlers.GetSpaces)
+		r.Post("/add", app.Handlers.AddSpace)
+		r.Route("/{spaceID}", func(r chi.Router) {
+			r.Put("/", app.Handlers.UpdateSpace)
+			r.Delete("/", app.Handlers.DeleteSpace)
+		})
+	})
+
 	return r
 }
