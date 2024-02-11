@@ -5,35 +5,33 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"space-management-system/app"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 )
 
-func (h *Handlers) GetSpacesInfo(w http.ResponseWriter, r *http.Request) {
-	//get space id, name, status, group and list of features + pagination
-}
-
-func (h *Handlers) AddSpace(w http.ResponseWriter, r *http.Request) {
+func AddSpace(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) DeleteSpace(w http.ResponseWriter, r *http.Request) {
+func DeleteSpace(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) UpdateSpace(w http.ResponseWriter, r *http.Request) {
+func UpdateSpace(w http.ResponseWriter, r *http.Request) {
 	//name, features, status, pricing group
 }
 
-func (h *Handlers) AddFeature(w http.ResponseWriter, r *http.Request) {
+func AddFeature(w http.ResponseWriter, r *http.Request) {
+	storage, _ := app.GetStorage()
 	r.ParseForm()
 	name := r.Form.Get("name")
 	if name == "" {
 		http.Error(w, "name is required field", 422)
 		return
 	}
-	added_id, err := h.Storage.AddFeature(context.Background(), name)
+	added_id, err := storage.AddFeature(context.Background(), name)
 	if err != nil {
 		http.Error(w, http.StatusText(500), 500)
 		return
@@ -49,10 +47,11 @@ func (h *Handlers) AddFeature(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
-func (h *Handlers) DeleteFeature(w http.ResponseWriter, r *http.Request) {
+func DeleteFeature(w http.ResponseWriter, r *http.Request) {
+	storage, _ := app.GetStorage()
 	id := chi.URLParam(r, "featureID")
 	idInt, _ := strconv.Atoi(id)
-	deleted_id, err := h.Storage.DeleteFeature(context.Background(), int32(idInt))
+	deleted_id, err := storage.DeleteFeature(context.Background(), int32(idInt))
 	log.Println(deleted_id, err)
 	if err != nil {
 		errMsg := err.Error()
@@ -70,46 +69,46 @@ func (h *Handlers) DeleteFeature(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
-func (h *Handlers) UpdateFeature(w http.ResponseWriter, r *http.Request) {
+func UpdateFeature(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) AddPricingPolicy(w http.ResponseWriter, r *http.Request) {
+func AddPricingPolicy(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) DeletePricingPolicy(w http.ResponseWriter, r *http.Request) {
+func DeletePricingPolicy(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) UpdatePricingPolicy(w http.ResponseWriter, r *http.Request) {
+func UpdatePricingPolicy(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) AddPricingGroup(w http.ResponseWriter, r *http.Request) {
+func AddPricingGroup(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) DeletePricingGroup(w http.ResponseWriter, r *http.Request) {
+func DeletePricingGroup(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) UpdatePricingGroup(w http.ResponseWriter, r *http.Request) {
+func UpdatePricingGroup(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) SetLocker(w http.ResponseWriter, r *http.Request) {
+func SetLocker(w http.ResponseWriter, r *http.Request) {
 	//set locker position and space status + check for reservations
 }
 
-func (h *Handlers) GetActiveReservations(w http.ResponseWriter, r *http.Request) {
+func GetActiveReservations(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) GetReservationHistory(w http.ResponseWriter, r *http.Request) {
+func GetReservationHistory(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) GetSpaceOccupancy(w http.ResponseWriter, r *http.Request) {
+func GetSpaceOccupancy(w http.ResponseWriter, r *http.Request) {
 	//by date
 }

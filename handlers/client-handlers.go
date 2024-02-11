@@ -4,40 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"space-management-system/app"
 	"space-management-system/services/db/db"
-	"space-management-system/utils"
 	"strconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func (h *Handlers) GetSpaces(w http.ResponseWriter, r *http.Request) {
-	queryParams := r.URL.Query()
-	features, ok := queryParams["features"]
-	var spaces interface{}
-	var err error
-	if ok {
-		featureslist, _ := h.Storage.GetFeatures(context.Background())
-		var featureIds []int32
-		for _, el := range featureslist {
-			if utils.ArrayIncludes(features, el.Name) {
-				featureIds = append(featureIds, el.ID)
-			}
-		}
-		if len(features) != len(featureIds) {
-			http.Error(w, http.StatusText(422), 422)
-			return
-		}
-
-		params := db.GetSpacesByFeatureListParams{
-			FeatureList:  featureIds,
-			FeatureCount: int32(len(featureIds)),
-		}
-		spaces, err = h.Storage.GetSpacesByFeatureList(context.Background(), params)
-	} else {
-		spaces, err = h.Storage.GetAllSpaces(context.Background())
-	}
-
+func GetSpaces(w http.ResponseWriter, r *http.Request) {
+	sm, _ := app.GetSpacesManager()
+	spaces, err := sm.GetSpaces()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -50,9 +26,31 @@ func (h *Handlers) GetSpaces(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write(jsonData)
 
+	// if ok {
+	// 	featureslist, _ := storage.GetFeatures(context.Background())
+	// 	var featureIds []int32
+	// 	for _, el := range featureslist {
+	// 		if utils.ArrayIncludes(features, el.Name) {
+	// 			featureIds = append(featureIds, el.ID)
+	// 		}
+	// 	}
+	// 	if len(features) != len(featureIds) {
+	// 		http.Error(w, http.StatusText(422), 422)
+	// 		return
+	// 	}
+
+	// 	params := db.GetSpacesByFeatureListParams{
+	// 		FeatureList:  featureIds,
+	// 		FeatureCount: int32(len(featureIds)),
+	// 	}
+	// 	spaces, err = storage.GetSpacesByFeatureList(context.Background(), params)
+	// } else {
+	// 	spaces, err = storage.GetAllSpaces(context.Background())
+	// }
+
 }
 
-func (h *Handlers) FindSpacesByFeatureList(w http.ResponseWriter, r *http.Request) {
+func FindSpacesByFeatureList(w http.ResponseWriter, r *http.Request) {
 	features := r.URL.Query().Get("features")
 	w.Write([]byte(features))
 	//parse Request for params (required features)
@@ -60,9 +58,9 @@ func (h *Handlers) FindSpacesByFeatureList(w http.ResponseWriter, r *http.Reques
 	//send response with the spaces
 }
 
-func (h *Handlers) GetFeatures(w http.ResponseWriter, r *http.Request) {
-
-	features, err := h.Storage.GetFeatures(context.Background())
+func GetFeatures(w http.ResponseWriter, r *http.Request) {
+	sm, _ := app.GetSpacesManager()
+	features, err := sm.GetFeatures()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -75,10 +73,12 @@ func (h *Handlers) GetFeatures(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
-func (h *Handlers) ReserveSpace(w http.ResponseWriter, r *http.Request) {
+func ReserveSpace(w http.ResponseWriter, r *http.Request) {
+	storage, _ := app.GetStorage()
 	r.ParseForm()
 	space_id, err := strconv.Atoi(r.Form.Get("space"))
 	car_number := r.Form.Get("car_number")
+
 	if car_number == "" {
 		http.Error(w, "car number is required parameter", 422)
 	}
@@ -91,11 +91,11 @@ func (h *Handlers) ReserveSpace(w http.ResponseWriter, r *http.Request) {
 		StatusID_2: pgtype.Int4{Int32: 2, Valid: true},
 	}
 
-	h.Storage.UpdateSpaceStatus(context.Background(), params)
+	storage.UpdateSpaceStatus(context.Background(), params)
 	//Find user car or create one
 	//Add reservation record
 }
 
-func (h *Handlers) UpdateReservationStatus(w http.ResponseWriter, r *http.Request) {
+func UpdateReservationStatus(w http.ResponseWriter, r *http.Request) {
 	//Find reservation by id and update it status
 }

@@ -6,7 +6,7 @@ import (
 )
 
 type Methods struct {
-	Storage app.StorageInterface
+	App *app.App
 }
 
 func (m *Methods) SetLocker(id int) error {
