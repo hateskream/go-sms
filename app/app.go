@@ -7,8 +7,9 @@ import (
 	"space-management-system/services/db/db"
 	"sync"
 
+	"time"
+
 	"github.com/jackc/pgx/v5/pgtype"
-	"modernc.org/libc/time"
 )
 
 type ActiveReservation struct {
@@ -72,7 +73,6 @@ type SpaceManager interface {
 	RenameFeature(id int32, name string) error
 	DeleteFeature(id int32) error
 	AddPricingGroup(name string) (int32, error)
-	GetReservationStatuses(ctx context.Context) ([]db.ReservationStatus, error)
 }
 
 type ReservationsManager interface {
@@ -80,7 +80,7 @@ type ReservationsManager interface {
 	AddNewReservation(car_number string, space_id int32, rservation_fee float32, time_to time.Time) (int32, error)
 	ChangeReservationStatus(id int32, status string) error
 	GetReservationHistory() ([]string, error)
-	GetActiveReservations() ([]string, error)
+	GetActiveReservations() ([]ActiveReservation, error)
 	UpdateReservationStatuses() error //updates reservation statuses in memory storage if needed
 	GetCarId(car_number string) (int32, error)
 }

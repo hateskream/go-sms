@@ -138,5 +138,5 @@ func (rm *ReservationsManager) UpdateReservationStatuses() error {
 }
 
 func (rm *ReservationsManager) GetReservationHistory() ([]string, error) {
-
+	return nil, nil
 }

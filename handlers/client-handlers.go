@@ -73,10 +73,10 @@ func ReserveSpace(w http.ResponseWriter, r *http.Request) {
 }
 
 func AddReservation(w http.ResponseWriter, r *http.Request) {
-	rm, _ := app.GetReservationManager()
+	// rm, _ := app.GetReservationManager()
 }
 
-func ConfirmReservation(w http.ResponseWriter, r *http.Request) {
+func UpdateReservation(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	id, err := strconv.Atoi(r.Form.Get("id"))
 	if err != nil {
