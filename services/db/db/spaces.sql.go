@@ -35,6 +35,18 @@ func (q *Queries) AddFeature(ctx context.Context, name string) (int32, error) {
 	return id, err
 }
 
+const addPricingGroup = `-- name: AddPricingGroup :one
+INSERT INTO pricing_groups (name)
+VALUES ($1) RETURNING id
+`
+
+func (q *Queries) AddPricingGroup(ctx context.Context, name string) (int32, error) {
+	row := q.db.QueryRow(ctx, addPricingGroup, name)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
 const addReservation = `-- name: AddReservation :one
 INSERT INTO space_reservations (time_from, time_to, car_id, reservation_fee, space_id, status_id)
 VALUES ($1,$2,$3,$4,$5,$6) RETURNING id
@@ -66,7 +78,7 @@ func (q *Queries) AddReservation(ctx context.Context, arg AddReservationParams) 
 const addSpace = `-- name: AddSpace :one
 INSERT INTO spaces (name, physical_id, group_id, status_id)
 VALUES ($1,$2,$3,$4)
-RETURNING  name, physical_id, group_id, status_id
+RETURNING  id
 `
 
 type AddSpaceParams struct {
@@ -76,28 +88,16 @@ type AddSpaceParams struct {
 	StatusID   pgtype.Int4 `json:"status_id"`
 }
 
-type AddSpaceRow struct {
-	Name       string      `json:"name"`
-	PhysicalID pgtype.Int4 `json:"physical_id"`
-	GroupID    pgtype.Int4 `json:"group_id"`
-	StatusID   pgtype.Int4 `json:"status_id"`
-}
-
-func (q *Queries) AddSpace(ctx context.Context, arg AddSpaceParams) (AddSpaceRow, error) {
+func (q *Queries) AddSpace(ctx context.Context, arg AddSpaceParams) (int32, error) {
 	row := q.db.QueryRow(ctx, addSpace,
 		arg.Name,
 		arg.PhysicalID,
 		arg.GroupID,
 		arg.StatusID,
 	)
-	var i AddSpaceRow
-	err := row.Scan(
-		&i.Name,
-		&i.PhysicalID,
-		&i.GroupID,
-		&i.StatusID,
-	)
-	return i, err
+	var id int32
+	err := row.Scan(&id)
+	return id, err
 }
 
 const assignSpaceFeature = `-- name: AssignSpaceFeature :one
@@ -118,6 +118,16 @@ func (q *Queries) AssignSpaceFeature(ctx context.Context, arg AssignSpaceFeature
 	return id, err
 }
 
+const cleanTimePricingPolicy = `-- name: CleanTimePricingPolicy :exec
+DELETE FROM time_pricing_policy
+WHERE group_id = $1
+`
+
+func (q *Queries) CleanTimePricingPolicy(ctx context.Context, groupID int32) error {
+	_, err := q.db.Exec(ctx, cleanTimePricingPolicy, groupID)
+	return err
+}
+
 const deleteFeature = `-- name: DeleteFeature :one
 DELETE FROM features
 WHERE id = $1 RETURNING id
@@ -125,6 +135,17 @@ WHERE id = $1 RETURNING id
 
 func (q *Queries) DeleteFeature(ctx context.Context, id int32) (int32, error) {
 	row := q.db.QueryRow(ctx, deleteFeature, id)
+	err := row.Scan(&id)
+	return id, err
+}
+
+const deletePricingGroup = `-- name: DeletePricingGroup :one
+DELETE FROM pricing_groups
+WHERE id = $1 RETURNING id
+`
+
+func (q *Queries) DeletePricingGroup(ctx context.Context, id int32) (int32, error) {
+	row := q.db.QueryRow(ctx, deletePricingGroup, id)
 	err := row.Scan(&id)
 	return id, err
 }
@@ -148,6 +169,65 @@ WHERE space_id = $1
 func (q *Queries) DeleteSpaceFeatures(ctx context.Context, spaceID pgtype.Int4) error {
 	_, err := q.db.Exec(ctx, deleteSpaceFeatures, spaceID)
 	return err
+}
+
+const generatTimePricingPolicy = `-- name: GeneratTimePricingPolicy :exec
+INSERT INTO time_pricing_policy (rate, hour, day_of_week, group_id)
+SELECT $2, hour, day_of_week, $1
+FROM generate_series(1, 8) AS day_of_week
+CROSS JOIN generate_series(1, 24) AS hour
+`
+
+type GeneratTimePricingPolicyParams struct {
+	GroupID int32   `json:"group_id"`
+	Rate    float32 `json:"rate"`
+}
+
+func (q *Queries) GeneratTimePricingPolicy(ctx context.Context, arg GeneratTimePricingPolicyParams) error {
+	_, err := q.db.Exec(ctx, generatTimePricingPolicy, arg.GroupID, arg.Rate)
+	return err
+}
+
+const getActiveReservations = `-- name: GetActiveReservations :many
+SELECT id, time_from, time_to, car_id, status_id, space_id
+FROM space_reservations as r
+WHERE status_id == 1 OR status_id == 2
+`
+
+type GetActiveReservationsRow struct {
+	ID       int32            `json:"id"`
+	TimeFrom pgtype.Timestamp `json:"time_from"`
+	TimeTo   pgtype.Timestamp `json:"time_to"`
+	CarID    pgtype.Int4      `json:"car_id"`
+	StatusID pgtype.Int4      `json:"status_id"`
+	SpaceID  pgtype.Int4      `json:"space_id"`
+}
+
+func (q *Queries) GetActiveReservations(ctx context.Context) ([]GetActiveReservationsRow, error) {
+	rows, err := q.db.Query(ctx, getActiveReservations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetActiveReservationsRow
+	for rows.Next() {
+		var i GetActiveReservationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TimeFrom,
+			&i.TimeTo,
+			&i.CarID,
+			&i.StatusID,
+			&i.SpaceID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getCardByNumber = `-- name: GetCardByNumber :one
@@ -178,6 +258,112 @@ func (q *Queries) GetFeatures(ctx context.Context) ([]Feature, error) {
 	var items []Feature
 	for rows.Next() {
 		var i Feature
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPricingPolicy = `-- name: GetPricingPolicy :many
+SELECT pg.name, tpp.id, tpp.rate, tpp.hour, tpp.day_of_week, tpp.group_id
+FROM time_pricing_policy as tpp
+JOIN pricing_groups as pg ON pg.id = tpp.group_id
+WHERE pg.id = $1
+`
+
+type GetPricingPolicyRow struct {
+	Name      string  `json:"name"`
+	ID        int32   `json:"id"`
+	Rate      float32 `json:"rate"`
+	Hour      int16   `json:"hour"`
+	DayOfWeek int16   `json:"day_of_week"`
+	GroupID   int32   `json:"group_id"`
+}
+
+func (q *Queries) GetPricingPolicy(ctx context.Context, id int32) ([]GetPricingPolicyRow, error) {
+	rows, err := q.db.Query(ctx, getPricingPolicy, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPricingPolicyRow
+	for rows.Next() {
+		var i GetPricingPolicyRow
+		if err := rows.Scan(
+			&i.Name,
+			&i.ID,
+			&i.Rate,
+			&i.Hour,
+			&i.DayOfWeek,
+			&i.GroupID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getReservationHistory = `-- name: GetReservationHistory :many
+SELECT id, time_from, time_to, car_id, reservation_fee, status_id, space_id, parking_time_from, parking_time_to, parking_fee, parking_fee_breakdown
+FROM space_reservations as r
+WHERE status_id != 1 AND status_id != 2
+`
+
+func (q *Queries) GetReservationHistory(ctx context.Context) ([]SpaceReservation, error) {
+	rows, err := q.db.Query(ctx, getReservationHistory)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SpaceReservation
+	for rows.Next() {
+		var i SpaceReservation
+		if err := rows.Scan(
+			&i.ID,
+			&i.TimeFrom,
+			&i.TimeTo,
+			&i.CarID,
+			&i.ReservationFee,
+			&i.StatusID,
+			&i.SpaceID,
+			&i.ParkingTimeFrom,
+			&i.ParkingTimeTo,
+			&i.ParkingFee,
+			&i.ParkingFeeBreakdown,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getReservationStatuses = `-- name: GetReservationStatuses :many
+SELECT id, name
+FROM reservation_statuses
+`
+
+func (q *Queries) GetReservationStatuses(ctx context.Context) ([]ReservationStatus, error) {
+	rows, err := q.db.Query(ctx, getReservationStatuses)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReservationStatus
+	for rows.Next() {
+		var i ReservationStatus
 		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
@@ -332,19 +518,51 @@ func (q *Queries) UpdateFeature(ctx context.Context, arg UpdateFeatureParams) er
 	return err
 }
 
-const updateReservationState = `-- name: UpdateReservationState :exec
+const updatePricingGroups = `-- name: UpdatePricingGroups :exec
+UPDATE pricing_groups
+  set name = $2
+  WHERE id = $1
+`
+
+type UpdatePricingGroupsParams struct {
+	ID   int32  `json:"id"`
+	Name string `json:"name"`
+}
+
+func (q *Queries) UpdatePricingGroups(ctx context.Context, arg UpdatePricingGroupsParams) error {
+	_, err := q.db.Exec(ctx, updatePricingGroups, arg.ID, arg.Name)
+	return err
+}
+
+const updatePricingPolicy = `-- name: UpdatePricingPolicy :exec
+UPDATE time_pricing_policy
+  set rate = $2
+  WHERE ID = $1
+`
+
+type UpdatePricingPolicyParams struct {
+	ID   int32   `json:"id"`
+	Rate float32 `json:"rate"`
+}
+
+func (q *Queries) UpdatePricingPolicy(ctx context.Context, arg UpdatePricingPolicyParams) error {
+	_, err := q.db.Exec(ctx, updatePricingPolicy, arg.ID, arg.Rate)
+	return err
+}
+
+const updateReservationStatus = `-- name: UpdateReservationStatus :exec
 UPDATE space_reservations
   set status_id = $2
 WHERE space_reservations.id = $1
 `
 
-type UpdateReservationStateParams struct {
+type UpdateReservationStatusParams struct {
 	ID       int32       `json:"id"`
 	StatusID pgtype.Int4 `json:"status_id"`
 }
 
-func (q *Queries) UpdateReservationState(ctx context.Context, arg UpdateReservationStateParams) error {
-	_, err := q.db.Exec(ctx, updateReservationState, arg.ID, arg.StatusID)
+func (q *Queries) UpdateReservationStatus(ctx context.Context, arg UpdateReservationStatusParams) error {
+	_, err := q.db.Exec(ctx, updateReservationStatus, arg.ID, arg.StatusID)
 	return err
 }
 

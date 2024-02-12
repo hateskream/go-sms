@@ -1,8 +1,14 @@
 -- name: AddSpace :one
 INSERT INTO spaces (name, physical_id, group_id, status_id)
 VALUES ($1,$2,$3,$4)
-RETURNING  name, physical_id, group_id, status_id;
+RETURNING  id;
 
+
+-- name: GetPricingPolicy :many
+SELECT pg.name, tpp.*
+FROM time_pricing_policy as tpp
+JOIN pricing_groups as pg ON pg.id = tpp.group_id
+WHERE pg.id = $1;
 
 -- name: AddPricingGroup :one
 INSERT INTO pricing_groups (name)
@@ -119,10 +125,24 @@ VALUES (sqlc.arg(number)::VARCHAR) RETURNING id;
 INSERT INTO space_reservations (time_from, time_to, car_id, reservation_fee, space_id, status_id)
 VALUES ($1,$2,$3,$4,$5,$6) RETURNING id;
 
--- name: UpdateReservationState :exec
+-- name: UpdateReservationStatus :exec
 UPDATE space_reservations
   set status_id = $2
 WHERE space_reservations.id = $1;
+
+-- name: GetReservationStatuses :many
+SELECT *
+FROM reservation_statuses;
+
+-- name: GetActiveReservations :many
+SELECT id, time_from, time_to, car_id, status_id, space_id
+FROM space_reservations as r
+WHERE status_id == 1 OR status_id == 2;
+
+-- name: GetReservationHistory :many
+SELECT *
+FROM space_reservations as r
+WHERE status_id != 1 AND status_id != 2;
 
 -- name: GetSpaceStatuses :many
 SELECT *
@@ -135,3 +155,4 @@ WHERE space_id = $1;
 -- name: AssignSpaceFeature :one
 INSERT INTO space_features (space_id, feature_id, is_required) 
 VALUES ($1, $2, $3) RETURNING id;
+

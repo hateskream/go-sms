@@ -6,88 +6,79 @@ import (
 	"log"
 	"net/http"
 	"space-management-system/app"
+	"space-management-system/services/db/db"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 )
 
-func UpdateSpaceFeature(w http.ResponseWriter, r *http.Request) {
+func AddSpace(w http.ResponseWriter, r *http.Request) {
+	sm, _ := app.GetSpacesManager()
 	r.ParseForm()
-	id := r.Form.Get("id")
-	if id == "" {
-		http.Error(w, "id is required field", 422)
+	name := r.Form.Get("name")
+	if name == "" {
+		http.Error(w, "name is required field", 422)
 		return
 	}
-	space_id, _ := strconv.Atoi(id)
-	var featuresSlice []app.SpaceFeature
-	featuresJson := r.Form.Get("features")
-	if featuresJson != "" {
-		features := json.Unmarshal([]byte(featuresJson))
+	physical_id := r.Form.Get("physical_id")
+	if physical_id == "" {
+		physical_id = "0"
 	}
-	sm, _ := app.GetSpacesManager()
-	err := sm.UpdateSpaceFeatures(int32(space_id), featuresSlice)
-}
+	physical_idInt, _ := strconv.Atoi(physical_id)
 
-// func AddSpace(w http.ResponseWriter, r *http.Request) {
+	group_id := r.Form.Get("group_id")
+	if group_id == "" {
+		group_id = "0"
+	}
+	group_idInt, _ := strconv.Atoi(group_id)
 
-// 	r.ParseForm()
-// 	name := r.Form.Get("name")
-// 	if name == "" {
-// 		http.Error(w, "name is required field", 422)
-// 		return
-// 	}
-// 	physical_id := r.Form.Get("physical_id")
-// 	physical_idInt, _ := strconv.Atoi(physical_id)
-// 	group_id := r.Form.Get("group_id")
-// 	group_idInt, _ := strconv.Atoi(group_id)
-// 	status_id := r.Form.Get("status_id")
-// 	status_idInt, _ := strconv.Atoi(status_id)
-// 	params := db.AddSpaceParams{
-// 		Name:       name,
-// 		PhysicalID: pgtype.Int4{Int32: int32(physical_idInt), Valid: true},
-// 		GroupID:    pgtype.Int4{Int32: int32(group_idInt), Valid: true},
-// 		StatusID:   pgtype.Int4{Int32: int32(status_idInt), Valid: true},
-// 	}
+	status := r.Form.Get("status")
 
-	log.Printf("GetRequest: %s %s %s %s", name, physical_id, group_id, status_id)
-	added, err := h.Storage.AddSpace(context.Background(), params)
+	added, err := sm.AddSpace(name, int32(physical_idInt), int32(group_idInt), status)
+
 	if err != nil {
-		http.Error(w, http.StatusText(500), 500)
+		http.Error(w, err.Error(), 500)
 		return
 	}
 	jsonData, err := json.Marshal(added)
 	if err != nil {
-		http.Error(w, http.StatusText(500), 500)
+		http.Error(w, err.Error(), 500)
 		return
 	}
 	w.Write(jsonData)
 }
 
-func (h *Handlers) DeleteSpace(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "spaceID")
-	if id == "" {
-		errMsg := "Id is required"
-		http.Error(w, errMsg, http.StatusUnprocessableEntity)
-		return
-	}
-	idInt, _ := strconv.Atoi(id)
-	deleted_id, err := h.Storage.DeleteSpace(context.Background(), int32(idInt))
-	log.Println(deleted_id, err)
-	if err != nil {
-		errMsg := err.Error()
-		http.Error(w, errMsg, 500)
-		return
-	}
-	response := struct {
-		Success bool   `json:"success"`
-		Message string `json:"message"`
-	}{
-		Success: true,
-		Message: "Feature successfully deleted.",
-	}
-	jsonData, _ := json.Marshal(response)
-	w.Write(jsonData)
+type updateFeatureRequest struct {
+	ID       string
+	Features []app.SpaceFeature
 }
+
+func UpdateSpaceFeatures(w http.ResponseWriter, r *http.Request) {
+	var data updateFeatureRequest
+	err := decodeJSONBody(w, r, &data)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	if data.ID == "" {
+		http.Error(w, "id field is required", http.StatusUnprocessableEntity)
+		return
+	}
+	space_id, _ := strconv.Atoi(data.ID)
+
+	sm, _ := app.GetSpacesManager()
+
+	err = sm.AssignSpaceFeatures(int32(space_id), data.Features)
+
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	w.Write(SuccessResponse("features were successfully updated"))
+
+}
+
 // func DeleteSpace(w http.ResponseWriter, r *http.Request) {
 // 	id := chi.URLParam(r, "spaceID")
 // 	idInt, _ := strconv.Atoi(id)
@@ -184,18 +175,6 @@ func (h *Handlers) DeleteSpace(w http.ResponseWriter, r *http.Request) {
 func DeleteFeature(w http.ResponseWriter, r *http.Request) {
 	storage, _ := app.GetStorage()
 	id := chi.URLParam(r, "featureID")
-
-	if id == "" {
-		errMsg := "Id is required"
-		http.Error(w, errMsg, http.StatusUnprocessableEntity)
-		return
-	}
-	w.Write(jsonData)
-}
-
-func DeleteFeature(w http.ResponseWriter, r *http.Request) {
-	storage, _ := app.GetStorage()
-	id := chi.URLParam(r, "featureID")
 	idInt, _ := strconv.Atoi(id)
 	deleted_id, err := storage.DeleteFeature(context.Background(), int32(idInt))
 	log.Println(deleted_id, err)
@@ -220,40 +199,32 @@ func DeleteFeature(w http.ResponseWriter, r *http.Request) {
 // 	id := chi.URLParam(r, "featureID")
 // 	idInt, _ := strconv.Atoi(id)
 
-	// 	r.ParseForm()
-	// 	name := r.Form.Get("name")
+// 	r.ParseForm()
+// 	name := r.Form.Get("name")
 
-	// 	params := db.UpdateFeatureParams{
-	// 		ID:   int32(idInt),
-	// 		Name: name,
-	// 	}
-	// 	err := storage.UpdateFeature(context.Background(), params)
+// 	params := db.UpdateFeatureParams{
+// 		ID:   int32(idInt),
+// 		Name: name,
+// 	}
+// 	err := storage.UpdateFeature(context.Background(), params)
 
-	// 	if err != nil {
-	// 		errMsg := err.Error()
-	// 		http.Error(w, errMsg, 500)
-	// 		return
-	// 	}
+// 	if err != nil {
+// 		errMsg := err.Error()
+// 		http.Error(w, errMsg, 500)
+// 		return
+// 	}
 
-	// 	response := struct {
-	// 		Success bool   `json:"success"`
-	// 		Message string `json:"message"`
-	// 	}{
-	// 		Success: true,
-	// 		Message: "Feature successfully updated.",
-	// 	}
-	// 	jsonData, _ := json.Marshal(response)
-	// 	w.Write(jsonData)
+// 	response := struct {
+// 		Success bool   `json:"success"`
+// 		Message string `json:"message"`
+// 	}{
+// 		Success: true,
+// 		Message: "Feature successfully updated.",
+// 	}
+// 	jsonData, _ := json.Marshal(response)
+// 	w.Write(jsonData)
 
 // }
-
-func AddPricingPolicy(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func DeletePricingPolicy(w http.ResponseWriter, r *http.Request) {
-
-}
 
 func UpdatePricingPolicy(w http.ResponseWriter, r *http.Request) {
 	// id := chi.URLParam(r, "featureID")
@@ -263,79 +234,35 @@ func UpdatePricingPolicy(w http.ResponseWriter, r *http.Request) {
 	// name := r.Form.Get("name")
 }
 
-func AddPricingGroup(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
-	name := r.Form.Get("name")
-	group_id, err := h.Storage.AddPricingGroup(context.Background(), name)
-
-	if err != nil {
-		errMsg := err.Error()
-		http.Error(w, errMsg, 500)
-		return
-	}
-	rate := 1
-
-	params := db.GeneratTimePricingPolicyParams{
-		GroupID: int32(group_id),
-		Rate:    float32(rate),
-	}
-
-	errGenerate := h.Storage.GeneratTimePricingPolicy(context.Background(), params)
-	if errGenerate != nil {
-		errGenerateMsg := errGenerate.Error()
-		http.Error(w, errGenerateMsg, 500)
-		return
-	}
-
-	response := struct {
-		Success bool   `json:"success"`
-		Message string `json:"message"`
-	}{
-		Success: true,
-		Message: "Group successfully added.",
-	}
-	jsonData, _ := json.Marshal(response)
-	w.Write(jsonData)
+func GetPricingPolicy(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *Handlers) DeletePricingGroup(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "pricing_groupID")
-	if id == "" {
-		errMsg := "Id is required"
+func AddPricingGroup(w http.ResponseWriter, r *http.Request) {
+	sm, _ := app.GetSpacesManager()
+	r.ParseForm()
+	name := r.Form.Get("name")
+	if name == "" {
+		errMsg := "Name is required"
 		http.Error(w, errMsg, http.StatusUnprocessableEntity)
 		return
 	}
-	idInt, _ := strconv.Atoi(id)
 
-	errClean := h.Storage.CleanTimePricingPolicy(context.Background(), int32(idInt))
-	if errClean != nil {
-		errMsg := errClean.Error()
-		http.Error(w, errMsg, 500)
-		return
-	}
-
-	group_id, err := h.Storage.DeletePricingGroup(context.Background(), int32(idInt))
+	group_id, err := sm.AddPricingGroup(name)
+	log.Println("group created", group_id)
 	if err != nil {
-		errMsg := err.Error()
-		http.Error(w, errMsg, 500)
-		return
+		http.Error(w, err.Error(), 500)
 	}
-	log.Printf("Deleted: %d", group_id)
-	response := struct {
-		Success bool   `json:"success"`
-		Message string `json:"message"`
-	}{
-		Success: true,
-		Message: "Group successfully deleted.",
-	}
-	jsonData, _ := json.Marshal(response)
-	w.Write(jsonData)
+
+	//GET GROUP_ID DATA
+
+	w.Write(SuccessResponse("Temporary success"))
 }
 
-func (h *Handlers) UpdatePricingGroups(w http.ResponseWriter, r *http.Request) {
+func RenamePricingGroup(w http.ResponseWriter, r *http.Request) {
+	storage, _ := app.GetStorage()
 
-	id := chi.URLParam(r, "pricing_groupID")
+	id := chi.URLParam(r, "id")
 	if id == "" {
 		errMsg := "Id is required"
 		http.Error(w, errMsg, http.StatusUnprocessableEntity)
@@ -350,28 +277,37 @@ func (h *Handlers) UpdatePricingGroups(w http.ResponseWriter, r *http.Request) {
 		ID:   int32(idInt),
 		Name: string(name),
 	}
-	log.Println(params)
-	err := h.Storage.UpdatePricingGroups(context.Background(), params)
+
+	err := storage.UpdatePricingGroups(context.Background(), params)
+
 	if err != nil {
-		errMsg := err.Error()
-		http.Error(w, errMsg, 500)
+		http.Error(w, err.Error(), 500)
 		return
 	}
-	response := struct {
-		Success bool   `json:"success"`
-		Message string `json:"message"`
-	}{
-		Success: true,
-		Message: "Group successfully updated.",
-	}
-	jsonData, _ := json.Marshal(response)
-	w.Write(jsonData)
-func DeletePricingGroup(w http.ResponseWriter, r *http.Request) {
 
+	w.Write(SuccessResponse("Group successfully renamed"))
 }
 
-func UpdatePricingGroup(w http.ResponseWriter, r *http.Request) {
+func DeletePricingGroup(w http.ResponseWriter, r *http.Request) {
+	storage, _ := app.GetStorage()
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Id is required", http.StatusUnprocessableEntity)
+		return
+	}
+	idInt, _ := strconv.Atoi(id)
 
+	deleted_id, err := storage.DeletePricingGroup(context.Background(), int32(idInt))
+	if deleted_id == 0 {
+		http.Error(w, "No requested id in database", 500)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	w.Write(SuccessResponse("Group successfully deleted"))
 }
 
 func SetLocker(w http.ResponseWriter, r *http.Request) {

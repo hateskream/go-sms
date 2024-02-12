@@ -6,10 +6,10 @@ import (
 	"log"
 	"space-management-system/app"
 	"space-management-system/services/db/db"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
-=
 
 type SpacesManager struct {
 	App                *app.App
@@ -20,10 +20,11 @@ type SpacesManager struct {
 	space_statuses     []db.SpaceStatus
 }
 
-func (sm *SpacesManager) SetApp(app *app.App) {
+func (sm *SpacesManager) SetApp(app *app.App) error {
 	sm.App = app
 	sm.price_updated_hour = -1
 	sm.GetSpaces()
+	return nil
 }
 
 func (sm *SpacesManager) spacesUpdated() {
@@ -46,6 +47,14 @@ func (sm *SpacesManager) GetSpaces() ([]app.SpaceWithPrice, error) { //get all s
 	}
 	sm.spaces = nil
 	for _, space := range spaces {
+		stringValue, ok := space.Features.(string)
+		if ok {
+			space.Features = strings.Split(string(stringValue), ",")
+		}
+		stringValue, ok = space.RequiredFeatures.(string)
+		if ok {
+			space.RequiredFeatures = strings.Split(string(stringValue), ",")
+		}
 		sm.spaces = append(sm.spaces, app.SpaceWithPrice{
 			GetSpacesRow: space,
 		})
@@ -72,7 +81,6 @@ func (sm *SpacesManager) UpdateSpaceStatus(space_id int32, curStatus string, new
 	}
 
 	params := db.UpdateSpaceStatusParams{ID: space_id}
-	log.Println("sm statuses", sm.space_statuses)
 	for _, status := range sm.space_statuses {
 		if status.Name == curStatus {
 			params.StatusID = pgtype.Int4{Int32: status.ID, Valid: true}
@@ -129,9 +137,50 @@ func (sm *SpacesManager) UpdateSpacePrices() error {
 	return nil
 }
 
-func (sm *SpacesManager) AddSpace(s *app.SpaceWithPrice) (int32, error) {
+func (sm *SpacesManager) AddSpace(name string, physicalId int32, groupId int32, status string) (int32, error) {
+	sm.UpdateSpaceStatuses()
+	if groupId == 0 || physicalId == 0 {
+		status = "disabled"
+	}
+	if groupId == 0 {
+		groupId = 1
+	}
 
-	return 0, nil
+	statusId := int32(0)
+	for _, s := range sm.space_statuses {
+		if s.Name == status {
+			statusId = s.ID
+		}
+
+		if statusId == 0 && s.Name == "disabled" {
+			statusId = s.ID
+		}
+	}
+
+	params := db.AddSpaceParams{
+		Name:       name,
+		PhysicalID: pgtype.Int4{Int32: int32(physicalId), Valid: true},
+		GroupID:    pgtype.Int4{Int32: int32(groupId), Valid: true},
+		StatusID:   pgtype.Int4{Int32: int32(statusId), Valid: true},
+	}
+
+	added, err := sm.App.Storage.AddSpace(context.Background(), params)
+	if err != nil {
+		return 0, err
+	}
+
+	sm.spaces = append(sm.spaces, app.SpaceWithPrice{
+		GetSpacesRow: db.GetSpacesRow{
+			ID:               added,
+			Name:             name,
+			Status:           status,
+			RequiredFeatures: nil,
+			Features:         nil,
+		},
+	})
+	sm.spacesUpdated()
+
+	return added, nil
 }
 
 func (sm *SpacesManager) UpdateSpace(s *app.SpaceWithPrice) (int32, error) {
@@ -144,7 +193,7 @@ func (sm *SpacesManager) DeleteSpace(id int32) error {
 	return nil
 }
 
-func (sm *SpacesManager) UpdateSpaceFeatures(space_id int32, features app.SpaceFeature) error {
+func (sm *SpacesManager) AssignSpaceFeatures(space_id int32, features []app.SpaceFeature) error {
 	ctx := context.Background()
 	space := pgtype.Int4{Int32: space_id, Valid: true}
 	err := sm.App.Storage.DeleteSpaceFeatures(ctx, space)
@@ -156,6 +205,10 @@ func (sm *SpacesManager) UpdateSpaceFeatures(space_id int32, features app.SpaceF
 	for _, feature := range sm.features {
 		featureMap[feature.Name] = feature.ID
 	}
+
+	var featureList []string
+	var requiredFeatureList []string
+
 	for _, feature := range features {
 		featureID := int32(featureMap[feature.Name])
 		params := db.AssignSpaceFeatureParams{
@@ -163,11 +216,24 @@ func (sm *SpacesManager) UpdateSpaceFeatures(space_id int32, features app.SpaceF
 			FeatureID:  pgtype.Int4{Int32: featureID, Valid: true},
 			IsRequired: feature.IsRequired,
 		}
+		featureList = append(featureList, feature.Name)
+		if feature.IsRequired == true {
+			requiredFeatureList = append(requiredFeatureList, feature.Name)
+		}
 		id, err := sm.App.Storage.AssignSpaceFeature(ctx, params)
 		if id == 0 || err != nil {
 			return errors.New("error assigning new feature")
 		}
 	}
+
+	for i := range sm.spaces {
+		if sm.spaces[i].ID == space_id {
+			sm.spaces[i].Features = featureList
+			sm.spaces[i].RequiredFeatures = requiredFeatureList
+			break
+		}
+	}
+	sm.spacesUpdated()
 
 	return nil
 }
@@ -197,8 +263,25 @@ func (sm *SpacesManager) DeleteFeature(id int32) error {
 	return nil
 }
 
+func (sm *SpacesManager) AddPricingGroup(name string) (int32, error) {
+
+	group_id, err := sm.App.Storage.AddPricingGroup(context.Background(), name)
+	if err != nil {
+		return 0, err
+	}
+
+	DEFAULT_RATE := 100
+	params := db.GeneratTimePricingPolicyParams{
+		GroupID: group_id,
+		Rate:    float32(DEFAULT_RATE),
+	}
+
+	err = sm.App.Storage.GeneratTimePricingPolicy(context.Background(), params)
+	if err != nil {
+		return 0, err
+	}
+	return group_id, nil
+}
+
 // get pricing group
-// add pricing group + timing policy for it (192 inserts)
-// rename pricing group
-// delete pricing group
 // update pricing policy (pricing_group_id and vaiable length array or days with 24records for each day)

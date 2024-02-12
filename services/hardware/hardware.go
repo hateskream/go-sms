@@ -9,7 +9,7 @@ type Methods struct {
 	App *app.App
 }
 
-func (m *Methods) SetLocker(id int) error {
+func (m *Methods) SetLocker(id int, up bool) error {
 	log.Println("Locker set", id)
 	return nil
 }

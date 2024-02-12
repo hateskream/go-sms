@@ -8,7 +8,11 @@ import (
 
 func initRoutes() *chi.Mux {
 	r := chi.NewRouter()
-	r.Get("/spaces", handlers.GetSpaces)
+	r.Route("/spaces", func(r chi.Router) {
+		r.Get("/", handlers.GetSpaces)
+		r.Post("/add", handlers.AddSpace)
+		r.Post("/features", handlers.UpdateSpaceFeatures)
+	})
 	r.Route("/features", func(r chi.Router) {
 		r.Get("/", handlers.GetFeatures) //РЕАЛИЗОВАНО
 		// r.Post("/add", handlers.AddFeature) // РЕАЛИЗОВАНО
@@ -21,17 +25,11 @@ func initRoutes() *chi.Mux {
 		r.Post("/add", handlers.ReserveSpace)
 	})
 	r.Route("/pricing_groups", func(r chi.Router) {
-		r.Get("/", app.Handlers.GetSpaces)
-		r.Post("/add", app.Handlers.AddPricingGroup)
-		r.Route("/{pricing_groupID}", func(r chi.Router) {
-			r.Put("/", app.Handlers.UpdatePricingGroups)
-			r.Delete("/", app.Handlers.DeletePricingGroup)
-		})
-	})
-	r.Route("/pricing_policy", func(r chi.Router) {
-		r.Route("/{pricing_policyID}", func(r chi.Router) {
-			r.Put("/", app.Handlers.UpdatePricingPolicy)
-		})
+		r.Post("/add", handlers.AddPricingGroup)
+		// r.Route("/{pricing_groupID}", func(r chi.Router) {
+		// 	r.Put("/", handlers.RenamePricingGroup)
+		// 	r.Delete("/", handlers.DeletePricingGroup)
+		// })
 	})
 
 	return r

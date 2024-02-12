@@ -72,6 +72,22 @@ func ReserveSpace(w http.ResponseWriter, r *http.Request) {
 	w.Write(SuccessResponse("space was successfully reserved"))
 }
 
+func AddReservation(w http.ResponseWriter, r *http.Request) {
+	rm, _ := app.GetReservationManager()
+}
+
+func ConfirmReservation(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	id, err := strconv.Atoi(r.Form.Get("id"))
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	rm, _ := app.GetReservationManager()
+	rm.ChangeReservationStatus(int32(id), "pending")
+}
+
 func UpdateReservationStatus(w http.ResponseWriter, r *http.Request) {
 	sm, _ := app.GetSpacesManager()
 	r.ParseForm()

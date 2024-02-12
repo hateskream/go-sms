@@ -8,6 +8,7 @@ import (
 	"os"
 	"space-management-system/app"
 	"space-management-system/services/db/db"
+	"space-management-system/services/reservations"
 	"space-management-system/services/spaces"
 
 	"github.com/jackc/pgx/v5"
@@ -44,10 +45,12 @@ func main() {
 
 	queries := db.New(conn)
 	spaceManager := &spaces.SpacesManager{}
+	ReservationsManager := &reservations.ReservationsManager{}
 
 	app := app.InitializeApp()
 	app.Storage = queries
 	app.SetSpaces(spaceManager)
+	app.SetReservations(ReservationsManager)
 
 	router := initRoutes()
 	server := http.Server{
