@@ -13,8 +13,12 @@ import (
 )
 
 type ActiveReservation struct {
-	db.GetActiveReservationsRow
-	Status string
+	ID       int32     `json:"id"`
+	TimeFrom time.Time `json:"time_from"`
+	TimeTo   time.Time `json:"time_to"`
+	CarID    int32     `json:"car_id"`
+	Status   string    `json:"status"`
+	SpaceID  int32     `json:"space_id"`
 }
 type SpaceWithPrice struct {
 	db.GetSpacesRow
@@ -52,6 +56,9 @@ type StorageManager interface {
 	GetReservationStatuses(ctx context.Context) ([]db.ReservationStatus, error)
 	GetActiveReservations(ctx context.Context) ([]db.GetActiveReservationsRow, error)
 	UpdateReservationStatus(ctx context.Context, arg db.UpdateReservationStatusParams) error
+	GetReservationsHistory(ctx context.Context, arg db.GetReservationsHistoryParams) ([]db.GetReservationsHistoryRow, error)
+	GetReservationsHistoryCount(ctx context.Context, arg db.GetReservationsHistoryCountParams) (int64, error)
+	UpdateReservationParkingData(ctx context.Context, arg db.UpdateReservationParkingDataParams) error
 }
 
 type HardwareManager interface {
@@ -77,10 +84,11 @@ type SpaceManager interface {
 
 type ReservationsManager interface {
 	SetApp(*App) error
-	AddNewReservation(car_number string, space_id int32, rservation_fee float32, time_to time.Time) (int32, error)
+	AddNewReservation(car_number string, space_id int32, rservation_fee float32, time_to time.Time, status string) (int32, error)
 	ChangeReservationStatus(id int32, status string) error
-	GetReservationHistory() ([]string, error)
+	GetReservationHistory(time_from time.Time, time_to time.Time, page int32, per_page int32) ([]db.GetReservationsHistoryRow, int32, error)
 	GetActiveReservations() ([]ActiveReservation, error)
+	UpdateReservationParkingData(data db.UpdateReservationParkingDataParams) error
 	UpdateReservationStatuses() error //updates reservation statuses in memory storage if needed
 	GetCarId(car_number string) (int32, error)
 }

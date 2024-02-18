@@ -8,6 +8,7 @@ import (
 	"space-management-system/app"
 	"space-management-system/services/db/db"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -79,99 +80,6 @@ func UpdateSpaceFeatures(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// func DeleteSpace(w http.ResponseWriter, r *http.Request) {
-// 	id := chi.URLParam(r, "spaceID")
-// 	idInt, _ := strconv.Atoi(id)
-// 	deleted_id, err := h.Storage.DeleteSpace(context.Background(), int32(idInt))
-// 	log.Println(deleted_id, err)
-// 	if err != nil {
-// 		errMsg := err.Error()
-// 		http.Error(w, errMsg, 500)
-// 		return
-// 	}
-// 	response := struct {
-// 		Success bool   `json:"success"`
-// 		Message string `json:"message"`
-// 	}{
-// 		Success: true,
-// 		Message: "Feature successfully deleted.",
-// 	}
-// 	jsonData, _ := json.Marshal(response)
-// 	w.Write(jsonData)
-// }
-
-// func (h *Handlers) UpdateSpace(w http.ResponseWriter, r *http.Request) {
-// 	id := chi.URLParam(r, "spaceID")
-// 	if id == "" {
-// 		errMsg := "Id is required"
-// 		http.Error(w, errMsg, http.StatusUnprocessableEntity)
-// 		return
-// 	}
-// 	idInt, _ := strconv.Atoi(id)
-// 	r.ParseForm()
-// 	name := r.Form.Get("name")
-// 	log.Printf("id: %s %s", id, name)
-// 	if name == "" {
-// 		http.Error(w, "name is required field", 422)
-// 		return
-// 	}
-// 	physical_id := r.Form.Get("physical_id")
-// 	physical_idInt, _ := strconv.Atoi(physical_id)
-// 	group_id := r.Form.Get("group_id")
-// 	group_idInt, _ := strconv.Atoi(group_id)
-// 	status_id := r.Form.Get("status_id")
-// 	status_idInt, _ := strconv.Atoi(status_id)
-
-// 	params := db.UpdateSpaceParams{
-// 		ID:         int32(idInt),
-// 		Name:       name,
-// 		PhysicalID: pgtype.Int4{Int32: int32(physical_idInt), Valid: true},
-// 		GroupID:    pgtype.Int4{Int32: int32(group_idInt), Valid: true},
-// 		StatusID:   pgtype.Int4{Int32: int32(status_idInt), Valid: true},
-// 	}
-
-// 	err := h.Storage.UpdateSpace(context.Background(), params)
-
-// 	if err != nil {
-// 		errMsg := err.Error()
-// 		http.Error(w, errMsg, 500)
-// 		return
-// 	}
-// 	response := struct {
-// 		Success bool   `json:"success"`
-// 		Message string `json:"message"`
-// 	}{
-// 		Success: true,
-// 		Message: "Feature successfully updated.",
-// 	}
-// 	jsonData, _ := json.Marshal(response)
-// 	w.Write(jsonData)
-// }
-
-// func AddFeature(w http.ResponseWriter, r *http.Request) {
-// 	storage, _ := app.GetStorage()
-// 	r.ParseForm()
-// 	name := r.Form.Get("name")
-// 	if name == "" {
-// 		http.Error(w, "name is required field", 422)
-// 		return
-// 	}
-// 	added_id, err := storage.AddFeature(context.Background(), name)
-// 	if err != nil {
-// 		http.Error(w, http.StatusText(500), 500)
-// 		return
-// 	}
-// 	data := map[string]int32{
-// 		"id": added_id,
-// 	}
-// 	jsonData, err := json.Marshal(data)
-// 	if err != nil {
-// 		http.Error(w, http.StatusText(500), 500)
-// 		return
-// 	}
-// 	w.Write(jsonData)
-// }
-
 func DeleteFeature(w http.ResponseWriter, r *http.Request) {
 	storage, _ := app.GetStorage()
 	id := chi.URLParam(r, "featureID")
@@ -192,50 +100,6 @@ func DeleteFeature(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonData, _ := json.Marshal(response)
 	w.Write(jsonData)
-}
-
-// func (h *Handlers) UpdateFeature(w http.ResponseWriter, r *http.Request) {
-
-// 	id := chi.URLParam(r, "featureID")
-// 	idInt, _ := strconv.Atoi(id)
-
-// 	r.ParseForm()
-// 	name := r.Form.Get("name")
-
-// 	params := db.UpdateFeatureParams{
-// 		ID:   int32(idInt),
-// 		Name: name,
-// 	}
-// 	err := storage.UpdateFeature(context.Background(), params)
-
-// 	if err != nil {
-// 		errMsg := err.Error()
-// 		http.Error(w, errMsg, 500)
-// 		return
-// 	}
-
-// 	response := struct {
-// 		Success bool   `json:"success"`
-// 		Message string `json:"message"`
-// 	}{
-// 		Success: true,
-// 		Message: "Feature successfully updated.",
-// 	}
-// 	jsonData, _ := json.Marshal(response)
-// 	w.Write(jsonData)
-
-// }
-
-func UpdatePricingPolicy(w http.ResponseWriter, r *http.Request) {
-	// id := chi.URLParam(r, "featureID")
-	// idInt, _ := strconv.Atoi(id)
-
-	// r.ParseForm()
-	// name := r.Form.Get("name")
-}
-
-func GetPricingPolicy(w http.ResponseWriter, r *http.Request) {
-
 }
 
 func AddPricingGroup(w http.ResponseWriter, r *http.Request) {
@@ -315,13 +179,59 @@ func SetLocker(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetActiveReservations(w http.ResponseWriter, r *http.Request) {
-
+	rm, _ := app.GetReservationManager()
+	reservations, err := rm.GetActiveReservations()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	response := struct {
+		Success      bool `json:"success"`
+		Reservations []app.ActiveReservation
+	}{
+		Success:      true,
+		Reservations: reservations,
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
 }
 
 func GetReservationHistory(w http.ResponseWriter, r *http.Request) {
+	data := struct {
+		Time_to   int64
+		Time_from int64
+		Page      int32
+		Per_page  int32
+	}{}
+	err := decodeJSONBody(w, r, &data)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	rm, _ := app.GetReservationManager()
+	if data.Page == 0 {
+		data.Page = 1
+	}
+	if data.Per_page == 0 {
+		data.Page = 10
+	}
+	time_from := time.Unix(data.Time_from, 0).UTC()
+	time_to := time.Unix(data.Time_to, 0).UTC()
+	reservations, count, err := rm.GetReservationHistory(time_from, time_to, data.Page, data.Per_page)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 
-}
-
-func GetSpaceOccupancy(w http.ResponseWriter, r *http.Request) {
-	//by date
+	response := struct {
+		Success      bool `json:"success"`
+		Count        int32
+		Reservations []db.GetReservationsHistoryRow
+	}{
+		Success:      true,
+		Count:        count,
+		Reservations: reservations,
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
 }

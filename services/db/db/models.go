@@ -62,8 +62,8 @@ type SpaceReservation struct {
 	SpaceID             pgtype.Int4      `json:"space_id"`
 	ParkingTimeFrom     pgtype.Timestamp `json:"parking_time_from"`
 	ParkingTimeTo       pgtype.Timestamp `json:"parking_time_to"`
-	ParkingFee          int32            `json:"parking_fee"`
-	ParkingFeeBreakdown int32            `json:"parking_fee_breakdown"`
+	ParkingFee          float32          `json:"parking_fee"`
+	ParkingFeeBreakdown float32          `json:"parking_fee_breakdown"`
 }
 
 type SpaceStatus struct {

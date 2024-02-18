@@ -2,9 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"space-management-system/app"
-	"strconv"
+	"time"
 )
 
 func SuccessResponse(msg string) []byte {
@@ -51,53 +52,65 @@ func GetFeatures(w http.ResponseWriter, r *http.Request) {
 }
 
 func ReserveSpace(w http.ResponseWriter, r *http.Request) {
+	data := struct {
+		Space_id   int32
+		Time_to    int64
+		Car_number string
+		Fee        float32
+	}{}
+	err := decodeJSONBody(w, r, &data)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	log.Println("data loaded", data)
 	sm, _ := app.GetSpacesManager()
-	r.ParseForm()
-	space_id, err := strconv.Atoi(r.Form.Get("space"))
-	// car_number := r.Form.Get("car_number")
-
-	// if car_number == "" {
-	// 	http.Error(w, "car number is required parameter", 422)
-	// }
-	if err != nil {
-		http.Error(w, "incorrect space_id", 422)
-		return
-	}
-	err = sm.UpdateSpaceStatus(int32(space_id), "open", "pending")
+	err = sm.UpdateSpaceStatus(data.Space_id, "open", "pending")
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-
-	w.Write(SuccessResponse("space was successfully reserved"))
-}
-
-func AddReservation(w http.ResponseWriter, r *http.Request) {
-	// rm, _ := app.GetReservationManager()
-}
-
-func UpdateReservation(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
-	id, err := strconv.Atoi(r.Form.Get("id"))
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-
 	rm, _ := app.GetReservationManager()
-	rm.ChangeReservationStatus(int32(id), "pending")
+	time := time.Unix(data.Time_to, 0).UTC()
+	id, err := rm.AddNewReservation(data.Car_number, data.Space_id, data.Fee, time, "pending")
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		sm.UpdateSpaceStatus(data.Space_id, "pending", "open")
+		return
+	}
+	response := struct {
+		Success bool  `json:"success"`
+		ID      int32 `json:"id"`
+	}{
+		Success: true,
+		ID:      id,
+	}
+	jsonData, _ := json.Marshal(response)
+	w.Write(jsonData)
 }
 
-func UpdateReservationStatus(w http.ResponseWriter, r *http.Request) {
-	sm, _ := app.GetSpacesManager()
-	r.ParseForm()
-	space_id, err := strconv.Atoi(r.Form.Get("space"))
-
-	err = sm.UpdateSpaceStatus(int32(space_id), "pending", "reserved")
+func ConfirmReservationPayment(w http.ResponseWriter, r *http.Request) {
+	data := struct {
+		Space_id int32
+	}{}
+	err := decodeJSONBody(w, r, &data)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
+	sm, _ := app.GetSpacesManager()
+	err = sm.UpdateSpaceStatus(data.Space_id, "pending", "reserved")
+
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	rm, _ := app.GetReservationManager()
+	err = rm.ChangeReservationStatus(data.Space_id, "reserved")
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 	w.Write(SuccessResponse("space was successfully reserved"))
 }

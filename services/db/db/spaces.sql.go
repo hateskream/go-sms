@@ -191,7 +191,7 @@ func (q *Queries) GeneratTimePricingPolicy(ctx context.Context, arg GeneratTimeP
 const getActiveReservations = `-- name: GetActiveReservations :many
 SELECT id, time_from, time_to, car_id, status_id, space_id
 FROM space_reservations as r
-WHERE status_id == 1 OR status_id == 2
+WHERE status_id = 1 OR status_id = 2
 `
 
 type GetActiveReservationsRow struct {
@@ -312,44 +312,6 @@ func (q *Queries) GetPricingPolicy(ctx context.Context, id int32) ([]GetPricingP
 	return items, nil
 }
 
-const getReservationHistory = `-- name: GetReservationHistory :many
-SELECT id, time_from, time_to, car_id, reservation_fee, status_id, space_id, parking_time_from, parking_time_to, parking_fee, parking_fee_breakdown
-FROM space_reservations as r
-WHERE status_id != 1 AND status_id != 2
-`
-
-func (q *Queries) GetReservationHistory(ctx context.Context) ([]SpaceReservation, error) {
-	rows, err := q.db.Query(ctx, getReservationHistory)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []SpaceReservation
-	for rows.Next() {
-		var i SpaceReservation
-		if err := rows.Scan(
-			&i.ID,
-			&i.TimeFrom,
-			&i.TimeTo,
-			&i.CarID,
-			&i.ReservationFee,
-			&i.StatusID,
-			&i.SpaceID,
-			&i.ParkingTimeFrom,
-			&i.ParkingTimeTo,
-			&i.ParkingFee,
-			&i.ParkingFeeBreakdown,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getReservationStatuses = `-- name: GetReservationStatuses :many
 SELECT id, name
 FROM reservation_statuses
@@ -373,6 +335,93 @@ func (q *Queries) GetReservationStatuses(ctx context.Context) ([]ReservationStat
 		return nil, err
 	}
 	return items, nil
+}
+
+const getReservationsHistory = `-- name: GetReservationsHistory :many
+SELECT space_reservations.id, time_from, time_to, car_id, reservation_fee, status_id, space_id, parking_time_from, parking_time_to, parking_fee, parking_fee_breakdown, tmp.id FROM space_reservations
+    INNER JOIN (      
+      SELECT id FROM space_reservations WHERE space_reservations.time_from >= $3 AND space_reservations.time_from <= $4
+      ORDER BY time_from, id LIMIT $1 OFFSET $2      
+    ) AS tmp USING (id) 
+ORDER BY
+  time_from
+`
+
+type GetReservationsHistoryParams struct {
+	Limit      int32            `json:"limit"`
+	Offset     int32            `json:"offset"`
+	TimeFrom   pgtype.Timestamp `json:"time_from"`
+	TimeFrom_2 pgtype.Timestamp `json:"time_from_2"`
+}
+
+type GetReservationsHistoryRow struct {
+	ID                  int32            `json:"id"`
+	TimeFrom            pgtype.Timestamp `json:"time_from"`
+	TimeTo              pgtype.Timestamp `json:"time_to"`
+	CarID               pgtype.Int4      `json:"car_id"`
+	ReservationFee      float32          `json:"reservation_fee"`
+	StatusID            pgtype.Int4      `json:"status_id"`
+	SpaceID             pgtype.Int4      `json:"space_id"`
+	ParkingTimeFrom     pgtype.Timestamp `json:"parking_time_from"`
+	ParkingTimeTo       pgtype.Timestamp `json:"parking_time_to"`
+	ParkingFee          float32          `json:"parking_fee"`
+	ParkingFeeBreakdown float32          `json:"parking_fee_breakdown"`
+	ID_2                int32            `json:"id_2"`
+}
+
+func (q *Queries) GetReservationsHistory(ctx context.Context, arg GetReservationsHistoryParams) ([]GetReservationsHistoryRow, error) {
+	rows, err := q.db.Query(ctx, getReservationsHistory,
+		arg.Limit,
+		arg.Offset,
+		arg.TimeFrom,
+		arg.TimeFrom_2,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetReservationsHistoryRow
+	for rows.Next() {
+		var i GetReservationsHistoryRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TimeFrom,
+			&i.TimeTo,
+			&i.CarID,
+			&i.ReservationFee,
+			&i.StatusID,
+			&i.SpaceID,
+			&i.ParkingTimeFrom,
+			&i.ParkingTimeTo,
+			&i.ParkingFee,
+			&i.ParkingFeeBreakdown,
+			&i.ID_2,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getReservationsHistoryCount = `-- name: GetReservationsHistoryCount :one
+SELECT COUNT(*) from space_reservations
+WHERE space_reservations.time_from > $1 AND space_reservations.time_from < $2
+`
+
+type GetReservationsHistoryCountParams struct {
+	TimeFrom   pgtype.Timestamp `json:"time_from"`
+	TimeFrom_2 pgtype.Timestamp `json:"time_from_2"`
+}
+
+func (q *Queries) GetReservationsHistoryCount(ctx context.Context, arg GetReservationsHistoryCountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getReservationsHistoryCount, arg.TimeFrom, arg.TimeFrom_2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const getSpacePrices = `-- name: GetSpacePrices :many
@@ -547,6 +596,31 @@ type UpdatePricingPolicyParams struct {
 
 func (q *Queries) UpdatePricingPolicy(ctx context.Context, arg UpdatePricingPolicyParams) error {
 	_, err := q.db.Exec(ctx, updatePricingPolicy, arg.ID, arg.Rate)
+	return err
+}
+
+const updateReservationParkingData = `-- name: UpdateReservationParkingData :exec
+UPDATE space_reservations
+  set parking_time_from = $2, parking_time_to = $3, parking_fee = $4, parking_fee_breakdown = $5
+WHERE space_reservations.id = $1
+`
+
+type UpdateReservationParkingDataParams struct {
+	ID                  int32            `json:"id"`
+	ParkingTimeFrom     pgtype.Timestamp `json:"parking_time_from"`
+	ParkingTimeTo       pgtype.Timestamp `json:"parking_time_to"`
+	ParkingFee          float32          `json:"parking_fee"`
+	ParkingFeeBreakdown float32          `json:"parking_fee_breakdown"`
+}
+
+func (q *Queries) UpdateReservationParkingData(ctx context.Context, arg UpdateReservationParkingDataParams) error {
+	_, err := q.db.Exec(ctx, updateReservationParkingData,
+		arg.ID,
+		arg.ParkingTimeFrom,
+		arg.ParkingTimeTo,
+		arg.ParkingFee,
+		arg.ParkingFeeBreakdown,
+	)
 	return err
 }
 

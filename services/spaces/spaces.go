@@ -3,6 +3,7 @@ package spaces
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"space-management-system/app"
 	"space-management-system/services/db/db"
@@ -89,11 +90,11 @@ func (sm *SpacesManager) UpdateSpaceStatus(space_id int32, curStatus string, new
 			params.StatusID_2 = pgtype.Int4{Int32: status.ID, Valid: true}
 		}
 	}
-
+	log.Println("")
 	id, err := sm.App.Storage.UpdateSpaceStatus(context.Background(), params)
 
 	if id == 0 {
-		return errors.New("Requested space is not open for reservation")
+		return fmt.Errorf("the space is not %s", curStatus)
 	}
 	if err != nil {
 		return err

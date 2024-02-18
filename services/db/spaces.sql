@@ -137,12 +137,7 @@ FROM reservation_statuses;
 -- name: GetActiveReservations :many
 SELECT id, time_from, time_to, car_id, status_id, space_id
 FROM space_reservations as r
-WHERE status_id == 1 OR status_id == 2;
-
--- name: GetReservationHistory :many
-SELECT *
-FROM space_reservations as r
-WHERE status_id != 1 AND status_id != 2;
+WHERE status_id = 1 OR status_id = 2;
 
 -- name: GetSpaceStatuses :many
 SELECT *
@@ -156,3 +151,20 @@ WHERE space_id = $1;
 INSERT INTO space_features (space_id, feature_id, is_required) 
 VALUES ($1, $2, $3) RETURNING id;
 
+-- name: GetReservationsHistory :many
+SELECT * FROM space_reservations
+    INNER JOIN (      
+      SELECT id FROM space_reservations WHERE space_reservations.time_from >= $3 AND space_reservations.time_from <= $4
+      ORDER BY time_from, id LIMIT $1 OFFSET $2      
+    ) AS tmp USING (id) 
+ORDER BY
+  time_from;
+
+-- name: GetReservationsHistoryCount :one  
+SELECT COUNT(*) from space_reservations
+WHERE space_reservations.time_from > $1 AND space_reservations.time_from < $2;
+
+-- name: UpdateReservationParkingData :exec
+UPDATE space_reservations
+  set parking_time_from = $2, parking_time_to = $3, parking_fee = $4, parking_fee_breakdown = $5
+WHERE space_reservations.id = $1;

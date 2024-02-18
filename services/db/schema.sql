@@ -49,8 +49,8 @@ CREATE TABLE "public"."space_reservations" (
     "space_id" int4,
     "parking_time_from" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "parking_time_to" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "parking_fee" int4 NOT NULL DEFAULT 0,
-    "parking_fee_breakdown" int4 NOT NULL DEFAULT 0,
+    "parking_fee" float4 NOT NULL DEFAULT 0,
+    "parking_fee_breakdown" float4 NOT NULL DEFAULT 0,
     PRIMARY KEY ("id")
 );
 
